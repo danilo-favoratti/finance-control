@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finance Manager</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Include jQuery from a CDN -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+
+    <header>
+        <h1>Finance Manager</h1>
+        <p>Upload expense files (CSV/TXT) or paste text to manage your finances.</p>
+    </header>
+
+    <main>
+        <section id="input-section">
+            <h2>Add Expenses</h2>
+            
+            <!-- Wrapper div for the two input boxes -->
+            <div class="input-boxes-container">
+                <!-- File Upload Area -->
+                <div id="upload-area">
+                    <h3>Upload File</h3>
+                    <div id="drop-zone" class="drop-zone">
+                        <p>Drag & Drop CSV or TXT file here, or click to select</p>
+                        <input type="file" id="file-input" accept=".csv,.txt" style="display: none;">
+                    </div>
+                    <div id="file-upload-status"></div>
+                </div>
+
+                <!-- Text Input Area -->
+                <div id="text-input-area">
+                    <h3>Paste Text</h3>
+                    <textarea id="text-input" placeholder="Paste your expense data here..."></textarea>
+                    <button id="submit-text-btn">Process Text</button>
+                    <div id="text-input-status"></div>
+                </div>
+            </div> <!-- End of wrapper div -->
+
+        </section>
+
+        <section id="expenses-section">
+            <h2>Expenses</h2>
+            
+            <!-- Search/Filter -->
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Search expenses...">
+            </div>
+
+            <!-- Expense Table -->
+            <table id="expenses-table">
+                <thead>
+                    <tr>
+                        <th data-sort="date">Date 📅</th>
+                        <th data-sort="description">Description 📝</th>
+                        <th data-sort="value">Value 💰</th>
+                    </tr>
+                </thead>
+                <tbody id="expenses-table-body">
+                    <!-- Expense rows will be added here by JavaScript -->
+                    <tr>
+                         <td colspan="3" style="text-align:center;">Loading expenses...</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div id="load-status"></div> <!-- For general loading/error messages -->
+        </section>
+    </main>
+
+    <footer>
+        <!-- Optional footer content -->
+    </footer>
+
+    <script src="scripts.js"></script>
+</body>
+</html> 

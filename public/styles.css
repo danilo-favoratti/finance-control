@@ -1,0 +1,226 @@
+/* General Styles */
+body {
+    font-family: sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f7f6;
+    color: #333;
+    line-height: 1.6;
+}
+
+header {
+    background-color: #007bff; /* Blue */
+    color: white;
+    padding: 1rem 2rem;
+    text-align: center;
+}
+
+header h1 {
+    margin: 0;
+}
+
+main {
+    padding: 2rem;
+    max-width: 1000px;
+    margin: 2rem auto;
+    background-color: white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    border-radius: 8px;
+}
+
+section {
+    margin-bottom: 2rem;
+}
+
+h2 {
+    color: #0056b3; /* Darker blue */
+    border-bottom: 2px solid #eee;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+h3 {
+    color: #333;
+    margin-bottom: 0.8rem;
+}
+
+/* Input Section */
+#input-section {
+    /* Removed flex styles */
+}
+
+/* NEW: Style the container for the input boxes */
+.input-boxes-container {
+    display: flex;
+    gap: 2rem;
+    align-items: stretch; /* Stretch items to fill container height */
+}
+
+#upload-area, #text-input-area {
+    border: 1px solid #ccc;
+    padding: 1.5rem;
+    border-radius: 5px;
+    background-color: #fff;
+    flex: 1; /* Ensure equal height */
+}
+
+/* Drag and Drop Zone */
+.drop-zone {
+    border: 2px dashed #007bff;
+    border-radius: 5px;
+    padding: 30px;
+    text-align: center;
+    cursor: pointer;
+    background-color: #e9f5ff;
+    color: #007bff;
+    transition: background-color 0.3s ease;
+}
+
+.drop-zone.dragover {
+    background-color: #cce7ff; /* Lighter blue on hover/drag */
+    border-style: solid;
+}
+
+.drop-zone p {
+    margin: 0;
+}
+
+/* Text Area & Buttons */
+textarea {
+    width: calc(100% - 22px); /* Account for padding/border */
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    min-height: 100px;
+    margin-bottom: 10px;
+    resize: vertical;
+}
+
+button {
+    background-color: #28a745; /* Green */
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #218838; /* Darker green */
+}
+
+/* Status Messages */
+#file-upload-status, #text-input-status, #load-status {
+    margin-top: 10px;
+    font-size: 0.9em;
+    min-height: 1.2em; /* Reserve space */
+}
+
+.status-success {
+    color: #28a745; /* Green */
+}
+
+.status-error {
+    color: #dc3545; /* Red */
+}
+
+.status-loading {
+    color: #007bff; /* Blue */
+}
+
+/* Expenses Section */
+.search-container {
+    margin-bottom: 1rem;
+}
+
+#search-input {
+    padding: 8px 12px;
+    width: 300px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* Expenses Table */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 10px 12px;
+    text-align: left;
+}
+
+thead {
+    background-color: #e9ecef; /* Light gray */
+    color: #495057;
+}
+
+thead th {
+    cursor: pointer;
+    user-select: none; /* Prevent text selection on click */
+}
+
+thead th:hover {
+    background-color: #ced4da;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f8f9fa;
+}
+
+tbody tr:hover {
+    background-color: #e2e6ea;
+}
+
+#expenses-table tbody tr.expense-income {
+    background-color: #e6ffed; /* Light green background */
+}
+
+#expenses-table tbody tr.expense-income:hover {
+    background-color: #d1f9e0; /* Slightly darker green on hover */
+}
+
+#expenses-table th[data-sort] {
+    cursor: pointer;
+    position: relative; /* Needed for absolute positioning of pseudo-elements */
+}
+
+#expenses-table th[data-sort]::after {
+    content: ''; /* Empty content, background/border will create the arrow */
+    position: absolute;
+    right: 10px; /* Adjust as needed */
+    top: 50%;
+    transform: translateY(-50%);
+    border: 5px solid transparent; /* Size of the arrow */
+    opacity: 0.5; /* Make default indicator subtle */
+    /* Default triangle pointing down slightly (for unsorted state or baseline) */
+    /* border-top-color: #ccc; 
+       You can uncomment this if you want a default subtle indicator */
+}
+
+#expenses-table th.sort-asc::after {
+    border-bottom-color: #333; /* Arrow pointing up */
+    border-top-color: transparent;
+    opacity: 1;
+}
+
+#expenses-table th.sort-desc::after {
+    border-top-color: #333; /* Arrow pointing down */
+    border-bottom-color: transparent;
+    opacity: 1;
+}
+
+/* Responsive adjustments (example) */
+@media (max-width: 768px) {
+    #input-section {
+        grid-template-columns: 1fr; /* Stack input areas on smaller screens */
+    }
+
+    #search-input {
+        width: calc(100% - 24px);
+    }
+} 
