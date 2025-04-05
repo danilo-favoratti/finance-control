@@ -55,24 +55,46 @@ async def add_multiple_expenses_to_db(collection: AsyncIOMotorCollection, expens
             if 'id' in expense_data: del expense_data['id'] # Remove any incoming ID
             if '_id' in expense_data: del expense_data['_id']
             
-            # Date handling (flexible parsing if needed)
-            if isinstance(expense_data.get('date'), str):
+            # Date handling: Parse string from agent/CSV to date object
+            date_input = expense_data.get('date')
+            parsed_date = None
+            if isinstance(date_input, str):
                 try:
-                    expense_data['date'] = datetime.strptime(expense_data['date'], '%Y-%m-%d').date()
+                    parsed_date = datetime.strptime(date_input, '%Y-%m-%d').date()
                 except ValueError:
-                    logger.warning(f"Skipping item #{item_index} due to invalid date format: {expense_data.get('date')}")
+                    logger.warning(f"Skipping item #{item_index} due to invalid date format: {date_input}")
                     errors.append(f"Item #{item_index} ({expense_data.get('description', '')[:20]}...): Invalid date format.")
                     continue
-            elif not isinstance(expense_data.get('date'), date):
-                 logger.warning(f"Skipping item #{item_index} due to missing or invalid date type: {expense_data.get('date')}")
-                 errors.append(f"Item #{item_index} ({expense_data.get('description', '')[:20]}...): Missing or invalid date.")
+            elif isinstance(date_input, date):
+                # Already a date object (e.g., direct input if we add that later)
+                parsed_date = date_input
+            # If it's neither a valid string nor a date, it's an error
+            elif date_input is not None: # Allow None if Optional is used
+                 logger.warning(f"Skipping item #{item_index} due to unexpected date type: {type(date_input)}")
+                 errors.append(f"Item #{item_index} ({expense_data.get('description', '')[:20]}...): Invalid date type.")
                  continue
+            
+            # Update the dict with the parsed date object, or None
+            expense_data['date'] = parsed_date
+            # Note: Pydantic validation later will fail if date is None and the model requires it.
+            # Our Expense model allows Optional[date], handled by Pydantic. Let's ensure it aligns.
+            # The DB model Expense expects date: date, so None might fail validation here.
+            # Let's re-check models/expense.py
 
+            # --> Correction based on Expense model: date is required (not Optional[date])
+            if parsed_date is None:
+                 logger.warning(f"Skipping item #{item_index} due to missing or unparseable date.")
+                 errors.append(f"Item #{item_index} ({expense_data.get('description', '')[:20]}...): Missing or unparseable date.")
+                 continue
+            else:
+                expense_data['date'] = parsed_date
+            
             # Value handling
+            value_input = expense_data.get('value')
             try:
-                expense_data['value'] = float(expense_data['value'])
+                expense_data['value'] = float(value_input)
             except (ValueError, TypeError):
-                logger.warning(f"Skipping item #{item_index} due to invalid value: {expense_data.get('value')}")
+                logger.warning(f"Skipping item #{item_index} due to invalid value: {value_input}")
                 errors.append(f"Item #{item_index} ({expense_data.get('description', '')[:20]}...): Invalid or missing value.")
                 continue
             
@@ -117,6 +139,18 @@ async def add_multiple_expenses_to_db(collection: AsyncIOMotorCollection, expens
         "errors": errors,
         "inserted_ids": inserted_ids
     }
+
+async def delete_all_expenses(collection: AsyncIOMotorCollection) -> Dict[str, Any]:
+    """Deletes all documents from the specified expense collection."""
+    logger.warning(f"Attempting to delete ALL documents from collection '{collection.name}'.")
+    try:
+        result = await collection.delete_many({})
+        deleted_count = result.deleted_count
+        logger.info(f"Successfully deleted {deleted_count} documents from collection '{collection.name}'.")
+        return {"status": "success", "deleted_count": deleted_count}
+    except Exception as e:
+        logger.error(f"Database error during delete_many operation: {e}")
+        raise ConnectionError(f"Database error deleting expenses: {e}")
 
 # --- File/Text Processing Functions --- 
 

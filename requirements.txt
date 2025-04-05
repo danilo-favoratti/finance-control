@@ -1,15 +1,10 @@
-# Python dependencies for Finance Manager Backend
-
-fastapi>=0.100.0
-uvicorn[standard]>=0.20.0
-pydantic>=2.0.0
-motor>=3.0.0
-openai>=1.0.0
-python-dotenv>=1.0.0
-# For file uploads
-python-multipart
-aiofiles # For StaticFiles 
-requests>=2.20.0 # General purpose HTTP requests (Specify modern version)
-
-# Added for OpenAI Agents SDK
-openai-agents 
+fastapi==0.115.12
+uvicorn[standard]==0.34.0
+pydantic==2.11.1
+motor==3.7.0
+openai==1.70.0
+python-dotenv==1.1.0
+python-multipart==0.0.20
+aiofiles==24.1.0
+requests==2.32.3
+openai-agents

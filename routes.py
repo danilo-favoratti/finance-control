@@ -124,7 +124,26 @@ async def process_expense_text(collection: ExpensesCollectionDep, text_input: An
         raise HTTPException(status_code=503, detail=str(ce))
     except Exception as e:
         logger.exception(f"Unexpected error processing text input: {e}")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred processing the text input.")
+        raise ConnectionError("Unexpected server error processing text input.")
+
+@router.delete("/expenses/all", summary="Delete All Expenses", description="Deletes all expense records from the database. Use with caution!")
+async def delete_all_expenses_route(collection: ExpensesCollectionDep):
+    """API endpoint to delete all expenses."""
+    logger.warning("DELETE /expenses/all endpoint called. This will clear the database.")
+    try:
+        result = await expenses_service.delete_all_expenses(collection)
+        logger.info(f"Delete all expenses result: {result}")
+        if result["status"] == "success":
+            return result
+        else:
+            # Should not happen based on service logic, but handle defensively
+             raise HTTPException(status_code=500, detail={"status": "error", "message": "Failed to delete expenses, unknown reason."}) 
+    except ConnectionError as ce:
+         logger.error(f"ConnectionError deleting all expenses: {ce}")
+         raise HTTPException(status_code=503, detail=str(ce))
+    except Exception as e:
+        logger.exception(f"Unexpected error deleting all expenses: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected server error occurred while deleting expenses.")
 
 # Remove the old duplicate placeholder routes below if they exist
 # (The routes @router.get("/expenses", ...) etc. defined earlier were placeholders and are now removed/replaced by the implementations above)

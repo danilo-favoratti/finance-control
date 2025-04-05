@@ -2,7 +2,7 @@
 import os
 import logging
 from dotenv import load_dotenv
-from typing import List, Dict, Any, Literal, Optional
+from typing import List, Dict, Any, Literal, Optional, Annotated
 from datetime import date
 
 # Use Pydantic for structured output definition
@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 # Import from agents SDK
 from agents import Agent, Runner
-from agents.models import Message # Import Message if needed for type hints, etc.
+# from agents.models import Message # Removed unused import causing error
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -29,7 +29,9 @@ if not api_key:
 # --- Define Structured Output Model ---
 # This mirrors the relevant fields from models/expense.py for the agent's output
 class ExpenseItem(BaseModel):
-    date: Optional[date] = Field(..., description="The date of the transaction in YYYY-MM-DD format.")
+    # Change type to Optional[str] to avoid schema issues with OpenAI
+    # Still instruct the LLM to return YYYY-MM-DD format
+    date: Annotated[Optional[str], Field(default=None, description="The date of the transaction in YYYY-MM-DD format. Use null if not determinable.")]
     description: str = Field(..., description="A brief description of the transaction.")
     value: float = Field(..., description="The monetary value. Negative for expenses/outgoing, positive for income/incoming.")
     in_out: Literal['in', 'out'] = Field(..., description="Indicates if the transaction is 'in' (income) or 'out' (expense).")
@@ -42,7 +44,7 @@ class ExpenseList(BaseModel):
 # System prompt explaining the task and expected output format
 SYSTEM_PROMPT = (
     "You are an expert financial assistant. Your task is to extract expense and income details "
-    "from the provided text. For each transaction, identify the date (in YYYY-MM-DD format), "
+    "from the provided text. For each transaction, identify the date (as a string in YYYY-MM-DD format), "
     "a brief description, the monetary value (as a float, negative for expenses/outgoing, positive for income/incoming), "
     "and whether it is 'in' (income) or 'out' (expense). "
     "Focus only on clear financial transactions. Ignore summaries or non-transactional text. "
@@ -56,11 +58,7 @@ expense_extractor_agent = Agent(
     instructions=SYSTEM_PROMPT,
     # Use the Pydantic model to enforce structured output
     output_type=ExpenseList, 
-    # Specify the model (optional, defaults might work, but explicit is better)
-    # Ensure the model supports the required structured output features (like function calling/JSON mode)
-    model="gpt-3.5-turbo-1106", 
-    # Set temperature (optional)
-    temperature=0.2
+    model="gpt-4o-mini" 
     # No tools needed for this specific task
 )
 

@@ -20,6 +20,13 @@ $(document).ready(function() {
     const $searchInput = $('#search-input');
     const $tableHeaders = $('#expenses-table thead th');
 
+    // Debug Menu Elements
+    const $debugButton = $('#debug-button');
+    const $debugMenu = $('#debug-menu');
+    const $cleanDbBtn = $('#clean-db-btn');
+    const $closeDebugBtn = $('#close-debug-btn');
+    const $debugStatus = $('#debug-status');
+
     // --- Utility Functions ---
     function displayStatus($element, message, type) {
         $element.text(message).removeClass('status-success status-error status-loading').addClass(`status-${type}`);
@@ -230,6 +237,31 @@ $(document).ready(function() {
         });
     }
 
+    // --- Debug Functions ---
+    function cleanDatabase() {
+        if (!confirm("Are you sure you want to delete ALL expenses from the database? This cannot be undone.")) {
+            return;
+        }
+        displayStatus($debugStatus, 'Cleaning database...', 'loading');
+        
+        $.ajax({
+            url: `${API_BASE_URL}/expenses/all`, // The new DELETE endpoint
+            method: 'DELETE',
+            success: function(response) {
+                const message = `Database cleaned successfully. Deleted ${response.deleted_count || 0} items. Refreshing...`;
+                displayStatus($debugStatus, message, 'success');
+                fetchExpenses(); // Refresh the main expenses table
+                // Optionally hide menu after success
+                // setTimeout(() => $debugMenu.addClass('hidden'), 2000);
+            },
+            error: function(jqXHR, textStatus, errorThrown) {
+                console.error("Error cleaning database:", textStatus, errorThrown, jqXHR.responseText);
+                const errorDetail = `Error cleaning database: ${jqXHR.responseJSON?.detail || jqXHR.responseText || errorThrown}`;
+                displayStatus($debugStatus, errorDetail, 'error');
+            }
+        });
+    }
+
     // --- Event Handlers ---
 
     // Drag and Drop
@@ -297,6 +329,20 @@ $(document).ready(function() {
     // Search Input
     $searchInput.on('keyup', function() {
         renderTable(expensesData); // Re-render table with current search term
+    });
+
+    // Debug Menu Handlers
+    $debugButton.on('click', function() {
+        $debugMenu.toggleClass('hidden');
+    });
+
+    $closeDebugBtn.on('click', function() {
+        $debugMenu.addClass('hidden');
+        $debugStatus.text('').removeClass('status-success status-error status-loading'); // Clear status on close
+    });
+
+    $cleanDbBtn.on('click', function() {
+        cleanDatabase();
     });
 
     // --- Initial Load ---

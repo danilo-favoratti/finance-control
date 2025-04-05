@@ -223,4 +223,90 @@ tbody tr:hover {
     #search-input {
         width: calc(100% - 24px);
     }
-} 
+}
+
+/* --- Debug Menu Styles --- */
+#debug-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #ffc107; /* Warning yellow */
+    color: #333;
+    border: 1px solid #e0a800;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000; /* Ensure it's above other content */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: background-color 0.2s ease;
+}
+
+#debug-button:hover {
+    background-color: #e0a800;
+}
+
+#debug-menu {
+    position: fixed;
+    bottom: 70px; /* Position above the button */
+    right: 20px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 15px;
+    width: 250px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    z-index: 999; /* Below button until shown */
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+#debug-menu.hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+#debug-menu h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 16px;
+    color: #495057;
+}
+
+#debug-menu button {
+    display: block;
+    width: 100%;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background-color: #e9ecef;
+    color: #495057;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+#debug-menu button:hover {
+    background-color: #dee2e6;
+}
+
+#debug-menu button#clean-db-btn {
+    background-color: #dc3545; /* Danger red */
+    color: white;
+    border-color: #dc3545;
+}
+
+#debug-menu button#clean-db-btn:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+}
+
+#debug-menu #debug-status {
+    font-size: 12px;
+    margin-top: 5px;
+    min-height: 15px; /* Reserve space */
+}
+/* --- End Debug Menu Styles --- */ 
