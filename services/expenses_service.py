@@ -6,7 +6,7 @@ import json # Import json for pretty printing
 from fastapi import UploadFile
 from typing import List, Dict, Any
 from models.expense import Expense
-from utils.openai_agent import process_text_with_agent # Import agent function
+from utils.openai_agent import process_text_with_agent, determine_sign_convention # Import both agent functions
 from motor.motor_asyncio import AsyncIOMotorCollection # Type hint for collection
 from pydantic import ValidationError
 from datetime import date, datetime
@@ -36,19 +36,24 @@ async def get_all_expenses_from_db(collection: AsyncIOMotorCollection, sort_by: 
         logger.info(f"Fetched {len(expenses)} expenses successfully.")
     except Exception as e:
         logger.error(f"Database error fetching expenses: {e}")
-        # Re-raise or handle as appropriate (e.g., raise HTTPException in route)
         raise ConnectionError(f"Database error fetching expenses: {e}")
     return expenses
 
-async def add_multiple_expenses_to_db(collection: AsyncIOMotorCollection, expenses_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+async def add_multiple_expenses_to_db(
+    collection: AsyncIOMotorCollection, 
+    expenses_data: List[Dict[str, Any]],
+    invert_signs: bool = False # New parameter to indicate if signs should be flipped
+) -> Dict[str, Any]:
     """Adds multiple expense documents to the MongoDB collection after validation."""
     if not expenses_data:
-        return {"status": "no_data", "added_count": 0, "errors": [], "inserted_ids": []}
+        return {"status": "no_data", "added_count": 0, "skipped_count": 0, "errors": [], "duplicates_info": [], "inserted_ids": []}
         
     logger.info(f"Attempting to add {len(expenses_data)} expenses to collection '{collection.name}'.")
     added_count = 0
+    skipped_count = 0
     errors = []
     valid_expenses_for_db = []
+    skipped_duplicates_info = [] # Store info about duplicates skipped
 
     for item_index, expense_data in enumerate(expenses_data):
         # Pretty print the dictionary using json.dumps for readability
@@ -92,6 +97,22 @@ async def add_multiple_expenses_to_db(collection: AsyncIOMotorCollection, expens
             else:
                 expense_data['date'] = parsed_date
             
+            # Check for Duplicates before Pydantic validation (using core fields)
+            # Convert date back to datetime for MongoDB query if needed
+            query_date = datetime.combine(parsed_date, datetime.min.time())
+            duplicate_check_filter = {
+                "date": query_date,
+                "description": expense_data.get("description"),
+                "value": expense_data.get("value") # Value should be consistent now
+            }
+            existing_doc = await collection.find_one(duplicate_check_filter)
+            if existing_doc:
+                logger.warning(f"Skipping item #{item_index} as duplicate found: {duplicate_check_filter}")
+                skipped_count += 1
+                # Store minimal info about the duplicate
+                skipped_duplicates_info.append(f"Dup: {expense_data.get('date')} - {expense_data.get('description', '')[:20]}...")
+                continue # Skip to next item
+
             # Value handling
             value_input = expense_data.get('value')
             try:
@@ -108,6 +129,14 @@ async def add_multiple_expenses_to_db(collection: AsyncIOMotorCollection, expens
             # Pydantic Validation
             expense_model = Expense(**expense_data)
             expense_dict = expense_model.model_dump(exclude_none=True)
+
+            # Apply sign inversion if needed BEFORE converting date for DB
+            if invert_signs:
+                logger.debug(f"Inverting sign for item #{item_index} based on pre-analysis.")
+                expense_dict['value'] *= -1
+                # Also update in_out if it was derived from the original value
+                expense_dict['in_out'] = 'in' if expense_dict['value'] >= 0 else 'out'
+
             # Convert date to datetime for MongoDB
             expense_dict['date'] = datetime.combine(expense_model.date, datetime.min.time())
             valid_expenses_for_db.append(expense_dict)
@@ -136,11 +165,14 @@ async def add_multiple_expenses_to_db(collection: AsyncIOMotorCollection, expens
             # You might need more complex logic to determine partial success here.
             added_count = 0 # Assume none were added if the operation fails
 
-    logger.info(f"Finished adding multiple expenses. Added: {added_count}, Errors: {len(errors)}")
+    logger.info(f"Finished adding multiple expenses. Added: {added_count}, Errors: {len(errors)}, Skipped: {skipped_count}")
+    status = "partial_success" if errors and added_count > 0 else ("success" if not errors else "error")
     return {
-        "status": "partial_success" if errors and added_count > 0 else ("success" if not errors else "error"),
+        "status": status,
         "added_count": added_count,
+        "skipped_count": skipped_count, # Add skipped count
         "errors": errors,
+        "duplicates_info": skipped_duplicates_info, # Add skipped info
         "inserted_ids": inserted_ids
     }
 
@@ -209,14 +241,21 @@ async def process_uploaded_file(collection: AsyncIOMotorCollection, file: Upload
         if file.content_type == "text/csv" or (file.filename and file.filename.lower().endswith('.csv')):
             logger.info("CSV file detected. Parsing...")
             extracted_data = parse_csv_content(content)
+            # Assume standard sign convention for CSV for now
+            invert_signs_needed = False
         elif file.content_type == "text/plain" or (file.filename and file.filename.lower().endswith('.txt')):
-            logger.info("TXT file detected. Decoding and sending to AI agent...")
+            logger.info("TXT file detected. Decoding and running analysis...")
             try:
                 text_content = content.decode('utf-8')
-                logger.info(f"Decoded TXT content (first 100 chars): {text_content[:100]}...") # Log decoded text start
-                # Call the actual OpenAI processing function (renamed for clarity)
-                extracted_data = await process_text_with_agent(text_content) 
-                logger.info(f"AI agent returned {len(extracted_data)} items from TXT file.") # Log items returned by AI
+                logger.info(f"Decoded TXT content (first 100 chars): {text_content[:100]}...")
+                
+                # 1. Determine sign convention
+                invert_signs_needed = await determine_sign_convention(text_content)
+                
+                # 2. Extract data using the other agent
+                logger.info(f"Extracting expense data from TXT (will invert signs: {invert_signs_needed})...")
+                extracted_data = await process_text_with_agent(text_content)
+                logger.info(f"AI agent returned {len(extracted_data)} items from TXT file.")
             except UnicodeDecodeError:
                  logger.error(f"Could not decode TXT file {file.filename}. Ensure UTF-8 encoding.")
                  raise ValueError("Could not read TXT file. Ensure UTF-8 encoding.")
@@ -233,7 +272,8 @@ async def process_uploaded_file(collection: AsyncIOMotorCollection, file: Upload
             return {"status": "success", "message": "No actionable data found in file.", "added_count": 0, "errors": []}
             
         logger.info(f"Adding {len(extracted_data)} items from {file.filename} to the database...")
-        db_result = await add_multiple_expenses_to_db(collection, extracted_data)
+        # Pass the determined sign inversion flag to the DB function
+        db_result = await add_multiple_expenses_to_db(collection, extracted_data, invert_signs=invert_signs_needed)
         return db_result # Return the result from the DB adding function
 
     except ValueError as ve:
@@ -257,17 +297,21 @@ async def process_text_input(collection: AsyncIOMotorCollection, text_data: str)
         raise ValueError("Text input cannot be empty.")
 
     try:
-        # Call the actual OpenAI processing function
-        logger.info(f"Sending text to AI agent (first 100 chars): {text_data[:100]}...") # Log text sent to AI
+        # 1. Determine sign convention
+        invert_signs_needed = await determine_sign_convention(text_data)
+
+        # 2. Call the expense extraction agent
+        logger.info(f"Sending text to AI agent (first 100 chars): {text_data[:100]}... (will invert signs: {invert_signs_needed})")
         extracted_data = await process_text_with_agent(text_data)
-        logger.info(f"AI agent returned {len(extracted_data)} items from text input.") # Log items returned by AI
+        logger.info(f"AI agent returned {len(extracted_data)} items from text input.")
         
         if not extracted_data:
             logger.info("AI agent returned no data from text input. Nothing to add to DB.")
             return {"status": "success", "message": "No actionable data found in text.", "added_count": 0, "errors": []}
 
         logger.info(f"Adding {len(extracted_data)} items from text input to the database...")
-        db_result = await add_multiple_expenses_to_db(collection, extracted_data)
+        # Pass the determined sign inversion flag to the DB function
+        db_result = await add_multiple_expenses_to_db(collection, extracted_data, invert_signs=invert_signs_needed)
         return db_result
     # Added except clauses to fix linter errors
     except ConnectionError as e: 

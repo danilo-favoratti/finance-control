@@ -19,6 +19,7 @@ $(document).ready(function() {
     const $loadStatus = $('#load-status');
     const $searchInput = $('#search-input');
     const $tableHeaders = $('#expenses-table thead th');
+    const $expensesHeader = $('#expenses-section h2');
 
     // Debug Menu Elements
     const $debugButton = $('#debug-button');
@@ -76,14 +77,23 @@ $(document).ready(function() {
         } else {
             filteredData.forEach(expense => {
                 const rowClass = expense.value >= 0 ? 'expense-income' : '';
+                const value = typeof expense.value === 'number' ? expense.value : parseFloat(expense.value);
                 const row = `<tr class="${rowClass}">
                                 <td>${expense.date}</td>
                                 <td>${expense.description}</td>
-                                <td>${expense.value.toFixed(2)}</td>
+                                <td>${isNaN(value) ? 'N/A' : value.toFixed(2)}</td>
                             </tr>`;
                 $expensesTableBody.append(row);
             });
         }
+        const totalRows = expensesData.length;
+        const displayedRows = filteredData.length;
+        let countText = `(${displayedRows} displayed`;
+        if(displayedRows !== totalRows) {
+            countText += ` of ${totalRows} total`;
+        }
+        countText += `)`;
+        $expensesHeader.text(`Expenses ${countText}`);
     }
 
     // --- API Calls ---
@@ -125,24 +135,30 @@ $(document).ready(function() {
                 let statusType = 'success';
 
                 if (response && response.status) {
+                    const added = response.added_count || 0;
+                    const skipped = response.skipped_count || 0;
+                    const errors = response.errors?.length || 0;
+
                     if (response.status === 'success') {
-                        message = `Successfully processed ${file.name}. Added ${response.added_count || 0} expenses. Refreshing list...`;
+                        message = `Successfully processed ${file.name}. Added ${added} expenses.`;
+                        if (skipped > 0) message += ` Skipped ${skipped} duplicates.`;
+                        message += " Refreshing list...";
                     } else if (response.status === 'partial_success') {
-                        message = `Partially processed ${file.name}. Added ${response.added_count || 0} expenses. ${response.errors?.length || 0} errors occurred. Refreshing list...`;
-                        // Optionally list errors if desired, might make the message too long
-                        // if (response.errors && response.errors.length > 0) {
-                        //    message += " Errors: " + response.errors.join(", ");
-                        // }
-                        statusType = 'warning'; // Use warning for partial success
+                        message = `Partially processed ${file.name}. Added ${added} expenses.`;
+                        if (skipped > 0) message += ` Skipped ${skipped} duplicates.`;
+                        if (errors > 0) message += ` ${errors} errors occurred.`;
+                        message += " Refreshing list...";
+                        statusType = 'warning';
                     } else if (response.status === 'error' || (response.status === 'no_data')) {
                         message = `Processed ${file.name}, but no expenses were added.`;
-                        if (response.errors && response.errors.length > 0) {
+                        if (skipped > 0) message += ` Skipped ${skipped} duplicates.`;
+                        if (errors > 0) {
                             message += ` Errors: ${response.errors.join(", ")}`;
                         }
                         statusType = 'error';
-                    } else if (response.message) { // Handle cases where only a message is returned
+                    } else if (response.message) {
                          message = response.message;
-                         statusType = jqXHR.status >= 400 ? 'error' : 'success'; // Guess based on HTTP status
+                         statusType = jqXHR.status >= 400 ? 'error' : 'success';
                     }
                 }
                 
@@ -189,18 +205,24 @@ $(document).ready(function() {
                 let statusType = 'success';
 
                 if (response && response.status) {
+                     const added = response.added_count || 0;
+                     const skipped = response.skipped_count || 0;
+                     const errors = response.errors?.length || 0;
+
                      if (response.status === 'success') {
-                        message = `Successfully processed text. Added ${response.added_count || 0} expenses. Refreshing list...`;
+                        message = `Successfully processed text. Added ${added} expenses.`;
+                        if (skipped > 0) message += ` Skipped ${skipped} duplicates.`;
+                        message += " Refreshing list...";
                     } else if (response.status === 'partial_success') {
-                        message = `Partially processed text. Added ${response.added_count || 0} expenses. ${response.errors?.length || 0} errors occurred. Refreshing list...`;
-                         // Optionally list errors
-                        // if (response.errors && response.errors.length > 0) {
-                        //    message += " Errors: " + response.errors.join(", ");
-                        // }
+                        message = `Partially processed text. Added ${added} expenses.`;
+                        if (skipped > 0) message += ` Skipped ${skipped} duplicates.`;
+                        if (errors > 0) message += ` ${errors} errors occurred.`;
+                        message += " Refreshing list...";
                         statusType = 'warning'; 
                     } else if (response.status === 'error' || (response.status === 'no_data')) {
                         message = `Processed text, but no expenses were added.`;
-                        if (response.errors && response.errors.length > 0) {
+                        if (skipped > 0) message += ` Skipped ${skipped} duplicates.`;
+                        if (errors > 0) {
                             message += ` Errors: ${response.errors.join(", ")}`;
                         }
                         statusType = 'error';

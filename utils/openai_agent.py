@@ -6,10 +6,10 @@ from typing import List, Dict, Any, Literal, Optional, Annotated
 from datetime import date
 
 # Use Pydantic for structured output definition
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # Import from agents SDK
-from agents import Agent, Runner
+from agents import Agent, Runner, ModelSettings
 # from agents.models import Message # Removed unused import causing error
 
 # Configure logging
@@ -33,47 +33,92 @@ class ExpenseItem(BaseModel):
     # Still instruct the LLM to return YYYY-MM-DD format
     date: Annotated[Optional[str], Field(default=None, description="The date of the transaction in YYYY-MM-DD format. Use null if not determinable.")]
     description: str = Field(..., description="A brief description of the transaction.")
-    value: float = Field(..., description="The monetary value. Negative for expenses/outgoing, positive for income/incoming.")
+    value: float = Field(..., description="The monetary value. MUST be negative for expenses/outgoing ('out'), and positive for income/incoming ('in').")
     in_out: Literal['in', 'out'] = Field(..., description="Indicates if the transaction is 'in' (income) or 'out' (expense).")
 
 class ExpenseList(BaseModel):
     transactions: List[ExpenseItem] = Field(..., description="A list of all extracted financial transactions.")
 
 
-# --- Define the Agent ---
-# System prompt explaining the task and expected output format
-SYSTEM_PROMPT = (
+# --- Define the Expense Extractor Agent (Modified Prompt slightly) ---
+EXPENSE_EXTRACTOR_PROMPT = (
     "You are an expert financial assistant. Your task is to extract expense and income details "
     "from the provided text. For each transaction, identify the date (as a string in YYYY-MM-DD format), "
-    "a brief description, the monetary value (as a float, negative for expenses/outgoing, positive for income/incoming), "
-    "and whether it is 'in' (income) or 'out' (expense). "
+    "a brief description, the monetary value (as a float), and whether it is 'in' (income) or 'out' (expense). "
+    "IMPORTANT VALUE SIGN HANDLING: " 
+    "1. First, check if the monetary value in the text already has a sign (+ or -). If it does, use that sign directly. "
+    "2. If the monetary value in the text is unsigned (just a number), then determine 'in' or 'out' based on keywords "
+       "(like 'payment', 'salary', 'expense', 'purchase', 'refund', 'income', etc.) or context. Assign a negative (-) sign for 'out' (expenses/payments made) "
+       "and a positive (+) sign for 'in' (income/refunds received). IMPORTANT: PAYMENT FOR THE CARD ITSELF IS NOT EXPENSE. PAYING ANOTHER CARD FROM THIS CARD IS EXPENSE!"
+    "Ensure the final 'value' field reflects the correct sign according to these rules. "
     "Focus only on clear financial transactions. Ignore summaries or non-transactional text. "
     "Ensure your output strictly matches the required format. "
     "If the input text is empty or contains no transaction data, return an empty list for 'transactions'."
 )
 
-# Create the agent instance
 expense_extractor_agent = Agent(
     name="ExpenseExtractor",
-    instructions=SYSTEM_PROMPT,
-    # Use the Pydantic model to enforce structured output
-    output_type=ExpenseList, 
-    model="gpt-4o-mini" 
-    # No tools needed for this specific task
+    instructions=EXPENSE_EXTRACTOR_PROMPT,
+    output_type=ExpenseList,
+    model="gpt-4o-mini",
+    model_settings=ModelSettings(temperature=0.2)
 )
 
-# --- Main Processing Function ---
+# --- Define Sign Convention Analysis Agent ---
+
+class SignConventionResult(BaseModel):
+    invert_signs: bool = Field(..., description="Set to true if the text uses negative values for income ('in') and positive for expenses ('out'). False otherwise.")
+
+SIGN_CONVENTION_PROMPT = (
+    "Analyze the following text, which contains financial transactions. Determine the sign convention used for monetary values. "
+    "The standard convention is positive (+) for income/inflow ('in') and negative (-) for expenses/outflow ('out'). "
+    "Does this text use the *inverted* convention (e.g., negative salary/income, positive purchases/expenses)? "
+    "Answer based on the typical pattern observed in the text. Return your result in the specified JSON format."
+)
+
+sign_convention_agent = Agent(
+    name="SignConventionChecker",
+    instructions=SIGN_CONVENTION_PROMPT,
+    output_type=SignConventionResult,
+    model="gpt-4o",
+    model_settings=ModelSettings(temperature=0.2)
+)
+
+# --- Main Processing Functions ---
+
+async def determine_sign_convention(text_content: str) -> bool:
+    """Uses an agent to determine if the text uses an inverted sign convention."""
+    if not text_content or not text_content.strip():
+        logger.warning("Received empty text content for sign convention analysis.")
+        return False # Assume standard convention for empty input
+    
+    sample_text = text_content[:1000]
+
+    logger.info("Running sign convention analysis agent...")
+    try:
+        result = await Runner.run(sign_convention_agent, input=sample_text)
+        if result.final_output and isinstance(result.final_output, SignConventionResult):
+            invert = result.final_output.invert_signs
+            logger.info(f"Sign convention analysis result: invert_signs = {invert}")
+            return invert
+        else:
+            logger.warning(f"Sign convention agent did not return expected structure. Assuming standard convention. Output: {result.final_output}")
+            return False
+    except Exception as e:
+        logger.exception(f"Error during sign convention analysis: {e}. Assuming standard convention.")
+        return False # Default to standard convention on error
+
 async def process_text_with_agent(text_content: str) -> List[Dict[str, Any]]:
     """
     Processes raw text using the configured OpenAI Agent to extract structured expense data.
-
     Relies on the Agent SDK's Runner and the agent's `output_type` for JSON structuring.
+    Note: Sign correction is NOT done here, it's handled later based on pre-analysis.
     """
     if not text_content or not text_content.strip():
-        logger.warning("Received empty text content for processing.")
+        logger.warning("Received empty text content for expense processing.")
         return []
 
-    logger.info(f"Processing text with Agent SDK (length: {len(text_content)} chars)...")
+    logger.info(f"Processing text with Expense Extractor Agent SDK (length: {len(text_content)} chars)...")
 
     try:
         # Run the agent asynchronously
