@@ -188,44 +188,18 @@ async def delete_all_expenses(collection: AsyncIOMotorCollection) -> Dict[str, A
         logger.error(f"Database error during delete_many operation: {e}")
         raise ConnectionError(f"Database error deleting expenses: {e}")
 
-# --- File/Text Processing Functions --- 
+async def clear_database(collection: AsyncIOMotorCollection) -> Dict[str, Any]:
+    """Clears all documents from the specified expense collection."""
+    return await delete_all_expenses(collection)
 
-def parse_csv_content(content: bytes) -> List[Dict[str, Any]]:
-    """Parses CSV content (bytes) into a list of dictionaries."""
-    expenses = []
-    try:
-        # Decode bytes to string and use StringIO to mimic a file
-        content_str = content.decode('utf-8')
-        csvfile = io.StringIO(content_str)
-        reader = csv.DictReader(csvfile)
-        expected_headers = ['date', 'description', 'value', 'in_out']
-        if not all(header in reader.fieldnames for header in expected_headers):
-            logger.error(f"CSV missing required headers. Found: {reader.fieldnames}. Expected: {expected_headers}")
-            raise ValueError(f"CSV must contain headers: {', '.join(expected_headers)}")
-        
-        for row_index, row in enumerate(reader):
-            # Basic cleaning
-            cleaned_row = {k.strip(): v.strip() for k, v in row.items()}
-            expenses.append(cleaned_row)
-        logger.info(f"Parsed {len(expenses)} rows from CSV.")
-        return expenses
-    except csv.Error as e:
-        logger.error(f"Error parsing CSV: {e}")
-        raise ValueError(f"Error parsing CSV file: {e}")
-    except UnicodeDecodeError:
-        logger.error("Could not decode CSV file content. Ensure it's UTF-8 encoded.")
-        raise ValueError("Could not read CSV file. Ensure it's UTF-8 encoded.")
-    except Exception as e:
-        logger.error(f"Unexpected error during CSV parsing: {e}")
-        raise ValueError("An unexpected error occurred while parsing the CSV file.")
+# --- File/Text Processing Functions --- 
 
 async def process_uploaded_file(collection: AsyncIOMotorCollection, file: UploadFile) -> Dict[str, Any]:
     """
     Processes an uploaded file (CSV or TXT).
     - Reads file content.
-    - If CSV, parses directly.
-    - If TXT, sends content to OpenAI agent.
-    - Validates extracted/parsed data.
+    - Sends content to OpenAI agent for processing.
+    - Validates extracted data.
     - Stores valid data in the database using the provided collection.
     - Returns a dictionary summarizing the result.
     """
@@ -233,42 +207,33 @@ async def process_uploaded_file(collection: AsyncIOMotorCollection, file: Upload
     extracted_data = []
     try:
         content = await file.read()
-        logger.info(f"Read {len(content)} bytes from {file.filename}.") # Log bytes read
+        logger.info(f"Read {len(content)} bytes from {file.filename}.")
         if not content:
              logger.warning(f"Uploaded file {file.filename} is empty.")
              return {"status": "error", "message": "File is empty.", "added_count": 0, "errors": ["File is empty."]}
 
-        if file.content_type == "text/csv" or (file.filename and file.filename.lower().endswith('.csv')):
-            logger.info("CSV file detected. Parsing...")
-            extracted_data = parse_csv_content(content)
-            # Assume standard sign convention for CSV for now
-            invert_signs_needed = False
-        elif file.content_type == "text/plain" or (file.filename and file.filename.lower().endswith('.txt')):
-            logger.info("TXT file detected. Decoding and running analysis...")
-            try:
-                text_content = content.decode('utf-8')
-                logger.info(f"Decoded TXT content (first 100 chars): {text_content[:100]}...")
-                
-                # 1. Determine sign convention
-                invert_signs_needed = await determine_sign_convention(text_content)
-                
-                # 2. Extract data using the other agent
-                logger.info(f"Extracting expense data from TXT (will invert signs: {invert_signs_needed})...")
-                extracted_data = await process_text_with_agent(text_content)
-                logger.info(f"AI agent returned {len(extracted_data)} items from TXT file.")
-            except UnicodeDecodeError:
-                 logger.error(f"Could not decode TXT file {file.filename}. Ensure UTF-8 encoding.")
-                 raise ValueError("Could not read TXT file. Ensure UTF-8 encoding.")
-            except ConnectionError as e:
-                logger.error(f"AI Connection error processing TXT file {file.filename}: {e}")
-                raise # Re-raise connection errors to be handled by the route
-        else:
-            logger.warning(f"Unsupported file type received in service: {file.content_type} / {file.filename}")
-            raise ValueError(f"Unsupported file type: {file.content_type}. Use CSV or TXT.")
+        # Process all files as text
+        try:
+            text_content = content.decode('utf-8')
+            logger.info(f"Decoded file content (first 100 chars): {text_content[:100]}...")
+            
+            # 1. Determine sign convention
+            invert_signs_needed = await determine_sign_convention(text_content)
+            
+            # 2. Extract data using the agent
+            logger.info(f"Extracting expense data from file (will invert signs: {invert_signs_needed})...")
+            extracted_data = await process_text_with_agent(text_content)
+            logger.info(f"AI agent returned {len(extracted_data)} items from file.")
+        except UnicodeDecodeError:
+             logger.error(f"Could not decode file {file.filename}. Ensure UTF-8 encoding.")
+             raise ValueError("Could not read file. Ensure UTF-8 encoding.")
+        except ConnectionError as e:
+            logger.error(f"AI Connection error processing file {file.filename}: {e}")
+            raise # Re-raise connection errors to be handled by the route
         
         # Add data to DB
         if not extracted_data:
-            logger.info(f"No data extracted or parsed from {file.filename}. Nothing to add to DB.")
+            logger.info(f"No data extracted from {file.filename}. Nothing to add to DB.")
             return {"status": "success", "message": "No actionable data found in file.", "added_count": 0, "errors": []}
             
         logger.info(f"Adding {len(extracted_data)} items from {file.filename} to the database...")
@@ -281,7 +246,7 @@ async def process_uploaded_file(collection: AsyncIOMotorCollection, file: Upload
         raise # Re-raise value errors (like parsing/decoding issues) to be handled by the route
     except Exception as e:
         logger.exception(f"Unexpected error processing file {file.filename}: {e}")
-        raise ConnectionError(f"Unexpected server error processing file {file.filename}.") # Treat unexpected as potential connection/server issue
+        raise ConnectionError(f"Unexpected server error processing file {file.filename}.")
 
 async def process_text_input(collection: AsyncIOMotorCollection, text_data: str) -> Dict[str, Any]:
     """

@@ -4,87 +4,136 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Finance Manager</title>
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Finance Manager">
+    <meta property="og:description" content="A simple and efficient tool to manage your finances and track expenses">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://finance.favoratti.com">
+    <meta property="og:image" content="https://finance.favoratti.com/og-image.png">
+    
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-16W495B37Y"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-16W495B37Y');
+    </script>
+    
     <link rel="stylesheet" href="styles.css">
     <!-- Include jQuery from a CDN -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
+    <div id="app-wrapper">
+        <header>
+            <h1>Finance Manager</h1>
+        </header>
 
-    <header>
-        <h1>Finance Manager</h1>
-        <p>Upload expense files (CSV/TXT) or paste text to manage your finances.</p>
-    </header>
+        <div id="app-layout">
+            <aside id="left-sidebar">
+                <h3>Navigation</h3>
+                <ul>
+                    <li>Dashboard (Future)</li>
+                    <li>Filters (Future)</li>
+                    <li>Settings (Future)</li>
+                </ul>
+            </aside>
 
-    <main>
-        <section id="input-section">
-            <h2>Add Expenses</h2>
-            
-            <!-- Wrapper div for the two input boxes -->
-            <div class="input-boxes-container">
-                <!-- File Upload Area -->
-                <div id="upload-area">
-                    <h3>Upload File</h3>
-                    <div id="drop-zone" class="drop-zone">
-                        <p>Drag & Drop CSV or TXT file here, or click to select</p>
-                        <input type="file" id="file-input" accept=".csv,.txt" style="display: none;">
-                    </div>
-                    <div id="file-upload-status"></div>
+            <main id="main-content">
+                <div class="container">
+                    <section id="input-section">
+                        <h2>Add Expenses</h2>
+                        <div class="input-boxes-container">
+                            <div id="upload-area">
+                                <h3>Upload File</h3>
+                                <div class="drop-zone" id="drop-zone">
+                                    <p>Drag & Drop CSV or TXT file here, or click to select</p>
+                                    <input type="file" id="file-input" accept=".csv,.txt" style="display: none;">
+                                </div>
+                                <div class="status-message" id="file-upload-status"></div>
+                            </div>
+                            <div id="text-input-area">
+                                <h3>Paste Text</h3>
+                                <div class="text-input-wrapper">
+                                    <textarea id="text-input" placeholder="Paste your expense data here..."></textarea>
+                                    <button id="process-text-btn"></button>
+                                </div>
+                                <div class="status-message" id="text-input-status"></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section id="expenses-list-section">
+                        <h2>
+                            <span>Expenses</span>
+                            <span class="secondary-info">
+                                <span id="expenses-displayed-count" class="stat-displayed"><span id="expenses-count">0</span> displayed</span>
+                                <span class="stat-separator">|</span>
+                                <span id="expenses-total-count" class="stat-total">0 total</span>
+                                <span class="stat-separator">|</span>
+                                <span id="expenses-sum-out" class="stat-expenses">Exp: $0.00</span>
+                                <span class="stat-separator">|</span>
+                                <span id="expenses-sum-in" class="stat-income">Inc: $0.00</span>
+                                <span class="stat-separator">|</span>
+                                <span id="expenses-sum-net" class="stat-net">Net: $0.00</span>
+                            </span>
+                        </h2>
+                        <div class="search-container">
+                            <input type="text" id="search-input" placeholder="Search expenses...">
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th data-sort="date">Date <span class="sort-icon"></span></th>
+                                        <th data-sort="description">Description <span class="sort-icon"></span></th>
+                                        <th data-sort="value">Value <span class="sort-icon"></span></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="expenses-table-body">
+                                    <!-- Expense rows will be inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
                 </div>
+            </main>
 
-                <!-- Text Input Area -->
-                <div id="text-input-area">
-                    <h3>Paste Text</h3>
-                    <textarea id="text-input" placeholder="Paste your expense data here..."></textarea>
-                    <button id="submit-text-btn">Process Text</button>
-                    <div id="text-input-status"></div>
+            <aside id="right-sidebar">
+                <h3>Details / Actions</h3>
+                <p>Select an expense to see details.</p>
+            </aside>
+        </div>
+
+        <footer>
+            <div class="footer-content">
+                <div class="sample-files">
+                    <span>Sample Files:</span>
+                    <a href="test-data/sample_expenses.csv" download>sample_expenses.csv</a>
+                    <span class="separator">|</span>
+                    <a href="test-data/sample_expenses.txt" download>sample_expenses.txt</a>
                 </div>
-            </div> <!-- End of wrapper div -->
-
-        </section>
-
-        <section id="expenses-section">
-            <h2>Expenses</h2>
-            
-            <!-- Search/Filter -->
-            <div class="search-container">
-                <input type="text" id="search-input" placeholder="Search expenses...">
+                <div class="footer-links">
+                    <a href="https://github.com/danilo-favoratti/finance-control" target="_blank">📦 GitHub</a>
+                    <span class="separator">|</span>
+                    <a href="https://favoratti.com" target="_blank">favoratti.com</a>
+                    <span class="separator">|</span>
+                    <button id="debug-button">⚙️</button>
+                </div>
             </div>
+        </footer>
+    </div>
 
-            <!-- Expense Table -->
-            <table id="expenses-table">
-                <thead>
-                    <tr>
-                        <th data-sort="date">Date 📅</th>
-                        <th data-sort="description">Description 📝</th>
-                        <th data-sort="value">Value 💰</th>
-                    </tr>
-                </thead>
-                <tbody id="expenses-table-body">
-                    <!-- Expense rows will be added here by JavaScript -->
-                    <tr>
-                         <td colspan="3" style="text-align:center;">Loading expenses...</td>
-                    </tr>
-                </tbody>
-            </table>
-            <div id="load-status"></div> <!-- For general loading/error messages -->
-        </section>
-    </main>
-
-    <footer>
-        <!-- Optional footer content -->
-    </footer>
-
-    <script src="scripts.js"></script>
-
-    <!-- Debug Menu -->
-    <div id="debug-button">🐞</div>
+    <!-- Debug Menu (Hidden by default) -->
     <div id="debug-menu" class="hidden">
-        <h3>Debug Options</h3>
-        <button id="clean-db-btn">Clean Database</button>
+        <h4>Debug Tools</h4>
+        <button id="clean-db-btn">Clear Database</button>
         <div id="debug-status"></div>
         <button id="close-debug-btn">Close</button>
     </div>
-    <!-- End Debug Menu -->
 
+    <script src="scripts.js"></script>
 </body>
 </html> 

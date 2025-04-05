@@ -174,6 +174,24 @@ async def delete_all_expenses_route(collection: ExpensesCollectionDep):
         logger.exception(f"Unexpected error deleting all expenses: {e}")
         raise HTTPException(status_code=500, detail="An unexpected server error occurred while deleting expenses.")
 
+@router.post("/expenses/clear")
+async def clear_database(collection: ExpensesCollectionDep):
+    """API endpoint to clear all expenses from the database."""
+    logger.warning("POST /expenses/clear endpoint called. This will clear the database.")
+    try:
+        result = await expenses_service.delete_all_expenses(collection)
+        logger.info(f"Clear database result: {result}")
+        if result["status"] == "success":
+            return result
+        else:
+            raise HTTPException(status_code=500, detail={"status": "error", "message": "Failed to clear database, unknown reason."})
+    except ConnectionError as ce:
+        logger.error(f"ConnectionError clearing database: {ce}")
+        raise HTTPException(status_code=503, detail=str(ce))
+    except Exception as e:
+        logger.exception(f"Unexpected error clearing database: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected server error occurred while clearing the database.")
+
 # Remove the old duplicate placeholder routes below if they exist
 # (The routes @router.get("/expenses", ...) etc. defined earlier were placeholders and are now removed/replaced by the implementations above)
 # @router.get("/expenses", response_model=List[Expense], summary="Get All Expenses", description="Retrieves all stored expense records.") ... 

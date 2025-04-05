@@ -13,13 +13,19 @@ $(document).ready(function() {
     const $fileInput = $('#file-input');
     const $fileStatus = $('#file-upload-status');
     const $textInput = $('#text-input');
-    const $submitTextBtn = $('#submit-text-btn');
+    const $processTextBtn = $('#process-text-btn');
     const $textStatus = $('#text-input-status');
     const $expensesTableBody = $('#expenses-table-body');
     const $loadStatus = $('#load-status');
     const $searchInput = $('#search-input');
     const $tableHeaders = $('#expenses-table thead th');
     const $expensesHeader = $('#expenses-section h2');
+    const $expensesCount = $('#expenses-count');
+    const $expensesDisplayedCountSpan = $('#expenses-displayed-count');
+    const $expensesTotalCountSpan = $('#expenses-total-count');
+    const $expensesSumOutSpan = $('#expenses-sum-out');
+    const $expensesSumInSpan = $('#expenses-sum-in');
+    const $expensesSumNetSpan = $('#expenses-sum-net');
 
     // Debug Menu Elements
     const $debugButton = $('#debug-button');
@@ -34,8 +40,17 @@ $(document).ready(function() {
     }
 
     function renderTable(data) {
-        $expensesTableBody.empty(); // Clear existing rows
-        if (!data || data.length === 0) {
+        $expensesTableBody.empty();
+
+        const totalCount = data ? data.length : 0;
+        $expensesTotalCountSpan.text(`${totalCount} total`);
+
+        // Clear stats if no initial data
+        if (totalCount === 0) {
+            $expensesCount.text(0);
+            $expensesSumOutSpan.text('Exp: $0.00');
+            $expensesSumInSpan.text('Inc: $0.00');
+            $expensesSumNetSpan.text('Net: $0.00');
             $expensesTableBody.append('<tr><td colspan="3" style="text-align:center;">No expenses found.</td></tr>');
             return;
         }
@@ -72,7 +87,38 @@ $(document).ready(function() {
               )
             : data;
 
-        if (filteredData.length === 0 && data.length > 0) {
+        // *** UPDATE STATS BASED ON FILTERED DATA ***
+        const displayedCount = filteredData.length;
+        $expensesCount.text(displayedCount);
+
+        let sumOut = 0;
+        let sumIn = 0;
+        let sumNet = 0;
+
+        filteredData.forEach(expense => {
+            const value = typeof expense.value === 'number' ? expense.value : parseFloat(expense.value);
+            if (!isNaN(value)) {
+                sumNet += value;
+                if (value < 0) {
+                    sumOut += value;
+                } else {
+                    sumIn += value;
+                }
+            }
+        });
+
+        // Format currency using toLocaleString
+        const formattedSumOut = sumOut.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const formattedSumIn = sumIn.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const formattedSumNet = sumNet.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        // Update stat spans
+        $expensesSumOutSpan.text(`Exp: $${formattedSumOut}`);
+        $expensesSumInSpan.text(`Inc: $${formattedSumIn}`);
+        $expensesSumNetSpan.text(`Net: $${formattedSumNet}`);
+
+        // Render rows
+        if (displayedCount === 0 && data.length > 0) {
              $expensesTableBody.append('<tr><td colspan="3" style="text-align:center;">No expenses match your search.</td></tr>');
         } else {
             filteredData.forEach(expense => {
@@ -83,20 +129,17 @@ $(document).ready(function() {
                 const $row = $('<tr>').addClass(rowClass);
                 const $dateCell = $('<td>').text(expense.date); // Use .text() for safety
                 const $descCell = $('<td>').text(expense.description); // Use .text() for safety
-                const $valueCell = $('<td>').text(isNaN(value) ? 'N/A' : value.toFixed(2)); // Use .text() for safety
+                const $valueCell = $('<td>').text(isNaN(value) ? 'N/A' : '$' + value.toFixed(2)); // Add dollar sign
+                
+                // Add positive-value class if value is positive
+                if (value > 0) {
+                    $row.addClass('positive-value');
+                }
                 
                 $row.append($dateCell, $descCell, $valueCell);
                 $expensesTableBody.append($row);
             });
         }
-        const totalRows = expensesData.length;
-        const displayedRows = filteredData.length;
-        let countText = `(${displayedRows} displayed`;
-        if(displayedRows !== totalRows) {
-            countText += ` of ${totalRows} total`;
-        }
-        countText += `)`;
-        $expensesHeader.text(`Expenses ${countText}`);
     }
 
     // --- API Calls ---
@@ -263,27 +306,27 @@ $(document).ready(function() {
     }
 
     // --- Debug Functions ---
-    function cleanDatabase() {
-        if (!confirm("Are you sure you want to delete ALL expenses from the database? This cannot be undone.")) {
-            return;
-        }
-        displayStatus($debugStatus, 'Cleaning database...', 'loading');
-        
-        $.ajax({
-            url: `${API_BASE_URL}/expenses/all`, // The new DELETE endpoint
-            method: 'DELETE',
-            success: function(response) {
-                const message = `Database cleaned successfully. Deleted ${response.deleted_count || 0} items. Refreshing...`;
-                displayStatus($debugStatus, message, 'success');
-                fetchExpenses(); // Refresh the main expenses table
-                setTimeout(() => $debugMenu.addClass('hidden'), 2000);
-            },
-            error: function(jqXHR, textStatus, errorThrown) {
-                console.error("Error cleaning database:", textStatus, errorThrown, jqXHR.responseText);
-                const errorDetail = `Error cleaning database: ${jqXHR.responseJSON?.detail || jqXHR.responseText || errorThrown}`;
-                displayStatus($debugStatus, errorDetail, 'error');
+    async function clearDatabase() {
+        try {
+            const response = await fetch('/api/expenses/clear', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                alert('Database cleared successfully!');
+                // Refresh expenses list (which will update the count)
+                await fetchExpenses();
+            } else {
+                const error = await response.json();
+                alert(`Error clearing database: ${error.detail}`);
             }
-        });
+        } catch (error) {
+            console.error('Error clearing database:', error);
+            alert('Error clearing database. Please try again.');
+        }
     }
 
     // --- Event Handlers ---
@@ -325,7 +368,7 @@ $(document).ready(function() {
     });
 
     // Text Input Submit
-    $submitTextBtn.on('click', function() {
+    $processTextBtn.on('click', function() {
         processText($textInput.val());
     });
 
@@ -366,7 +409,7 @@ $(document).ready(function() {
     });
 
     $cleanDbBtn.on('click', function() {
-        cleanDatabase();
+        clearDatabase();
     });
 
     // --- Initial Load ---

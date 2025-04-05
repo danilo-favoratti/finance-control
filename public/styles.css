@@ -1,267 +1,532 @@
-/* General Styles */
-body {
-    font-family: sans-serif;
+/* Reset and Basic Styling */
+html, body {
+    height: 100%;
     margin: 0;
     padding: 0;
-    background-color: #f4f7f6;
-    color: #333;
-    line-height: 1.6;
+    overflow: hidden; /* Prevent body scroll */
 }
 
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #1c1c1c; /* Slightly adjusted dark background */
+    color: #e0e0e0; /* Light text */
+    line-height: 1.6;
+    display: flex;
+    flex-direction: column;
+}
+
+#app-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Header */
 header {
-    background-color: #007bff; /* Blue */
-    color: white;
-    padding: 1rem 2rem;
-    text-align: center;
+    background-color: #252526; /* Refined header background */
+    color: #ffffff;
+    padding: 0 1rem;
+    height: 52px; /* Slightly taller header */
+    display: none; /* Hide the header */
+    align-items: center;
+    border-bottom: 1px solid #3a3a3a; /* Darker border */
+    flex-shrink: 0;
 }
 
 header h1 {
     margin: 0;
+    font-size: 1.1rem; /* Adjusted title size */
+    font-weight: 500; /* Medium weight */
+    line-height: normal;
 }
 
-main {
-    padding: 2rem;
-    max-width: 1000px;
-    margin: 2rem auto;
-    background-color: white;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    border-radius: 8px;
+/* Main Layout Area (Sidebars + Content) */
+#app-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
 }
 
-section {
-    margin-bottom: 2rem;
+/* Left Sidebar (Hidden) */
+#left-sidebar {
+    /* width: 240px; */ /* Keep width commented out for now */
+    background-color: #1e1e1e;
+    border-right: 1px solid #333;
+    padding: 1rem;
+    overflow-y: auto;
+    flex-shrink: 0;
+    display: none; /* Hide for now */
 }
 
+/* Main Content Area */
+#main-content {
+    flex: 1;
+    background-color: #1c1c1c; /* Match body background */
+    padding: 1.5rem; /* Increased padding */
+    overflow-y: auto;
+}
+
+/* Right Sidebar (Hidden) */
+#right-sidebar {
+    /* width: 280px; */ /* Keep width commented out for now */
+    background-color: #1e1e1e;
+    border-left: 1px solid #333;
+    padding: 1rem;
+    overflow-y: auto;
+    flex-shrink: 0;
+    display: none; /* Hide for now */
+}
+
+/* Container within main content (Not really needed with current setup) */
+.container {
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: transparent;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* Section Titles */
 h2 {
-    color: #0056b3; /* Darker blue */
-    border-bottom: 2px solid #eee;
-    padding-bottom: 0.5rem;
+    color: #f0f0f0; /* Brighter white */
+    margin-top: 0;
     margin-bottom: 1rem;
+    border-bottom: 1px solid #3a3a3a;
+    padding-bottom: 0.5rem;
+    font-size: 1.3rem;
+    font-weight: 500;
+    display: flex; /* Use flexbox for alignment */
+    justify-content: space-between; /* Push secondary info to the right */
+    align-items: baseline; /* Align text baselines */
+}
+
+/* Style for secondary info within H2 (e.g., the count part) */
+h2 .secondary-info {
+    font-size: 0.9rem;
+    color: #a0a0a0; /* Default secondary color */
+    font-weight: 400;
+    margin-left: 8px;
+    display: flex; /* Use flex for inline display */
+    align-items: baseline;
+    gap: 8px; /* Space between stats */
+}
+
+/* Individual stat styles */
+.stat-displayed {
+    color: #a0a0a0; /* Restore original secondary color */
+}
+
+.stat-total {
+    color: #cccccc; /* Slightly brighter */
+}
+
+.stat-expenses {
+    color: #ff8080; /* Light red/pink */
+}
+
+.stat-income {
+    color: #80ff80; /* Light green */
+}
+
+.stat-net {
+    color: #ffffff; /* White */
+    font-weight: 500; /* Slightly bolder */
+}
+
+/* Separator style */
+.stat-separator {
+    color: #555; /* Dark grey separator */
+    margin: 0 2px;
 }
 
 h3 {
-    color: #333;
-    margin-bottom: 0.8rem;
+    color: #d0d0d0; /* Slightly brighter grey */
+    margin: 0 0 0.8rem 0; /* Increased bottom margin */
+    border-bottom: none;
+    font-size: 1rem;
+    font-weight: 500;
 }
 
 /* Input Section */
 #input-section {
-    /* Removed flex styles */
+    margin: 0 0 1.5rem 0; /* Increased bottom margin */
+    background-color: #252526; /* Match header background */
+    padding: 1.5rem;
+    border-radius: 8px; /* Slightly more rounded */
+    border: 1px solid #3a3a3a;
 }
 
-/* NEW: Style the container for the input boxes */
 .input-boxes-container {
     display: flex;
-    gap: 2rem;
-    align-items: stretch; /* Stretch items to fill container height */
+    gap: 1.5rem; /* Increased gap */
+    margin: 0; /* Remove margin */
+    align-items: stretch;
 }
 
 #upload-area, #text-input-area {
-    border: 1px solid #ccc;
-    padding: 1.5rem;
-    border-radius: 5px;
-    background-color: #fff;
-    flex: 1; /* Ensure equal height */
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem; /* Increased gap */
+    background-color: transparent; /* Remove inner background */
+    padding: 0; /* Remove inner padding */
+    border-radius: 0;
+    border: none; /* Remove inner border */
 }
 
-/* Drag and Drop Zone */
+/* Drop Zone */
 .drop-zone {
-    border: 2px dashed #007bff;
-    border-radius: 5px;
-    padding: 30px;
-    text-align: center;
+    height: 150px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border: 1px dashed #5a5a5a; /* Subtler dashed border */
+    border-radius: 6px;
+    padding: 1rem;
+    background-color: #1e1e1e; /* Darker background */
+    color: #a0a0a0;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
     cursor: pointer;
-    background-color: #e9f5ff;
-    color: #007bff;
-    transition: background-color 0.3s ease;
+    text-align: center;
 }
 
 .drop-zone.dragover {
-    background-color: #cce7ff; /* Lighter blue on hover/drag */
-    border-style: solid;
+    background-color: #2a2a2a;
+    border-color: #777;
+    border-style: dashed;
 }
 
 .drop-zone p {
     margin: 0;
+    font-size: 0.9rem;
 }
 
-/* Text Area & Buttons */
-textarea {
-    width: calc(100% - 22px); /* Account for padding/border */
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    min-height: 100px;
-    margin-bottom: 10px;
-    resize: vertical;
+/* Text Input Area */
+.text-input-wrapper {
+    position: relative; /* Needed for absolute positioning of child */
+    flex: 1; /* Allow wrapper to take space */
+    display: flex; /* Ensure textarea fills wrapper */
 }
 
+#text-input {
+    /* height: 150px; Remove fixed height */
+    flex: 1; /* Allow textarea to fill wrapper */
+    resize: none;
+    padding: 0.8rem 1rem;
+    padding-bottom: 3rem; /* Add padding at bottom for button */
+    border: 1px solid #3a3a3a; /* Solid border */
+    border-radius: 6px;
+    font-size: 1rem;
+    line-height: 1.5;
+    background-color: #1e1e1e; /* Darker background */
+    color: #e0e0e0;
+}
+
+#text-input::placeholder {
+    color: #777;
+}
+
+#text-input:focus {
+    outline: none;
+    border-color: #4a90e2;
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+}
+
+/* Buttons */
 button {
-    background-color: #28a745; /* Green */
-    color: white;
-    padding: 10px 15px;
+    padding: 0.5rem 1rem;
+    margin: 0.5rem 0 0 0;
+    background-color: #366dc7; /* Adjusted blue */
+    color: #ffffff;
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    transition: background-color 0.2s ease;
+    font-size: 0.9rem;
+    font-weight: 500;
 }
 
 button:hover {
-    background-color: #218838; /* Darker green */
+    background-color: #4a81d8; /* Lighter blue on hover */
 }
 
-/* Status Messages */
-#file-upload-status, #text-input-status, #load-status {
-    margin-top: 10px;
-    font-size: 0.9em;
-    min-height: 1.2em; /* Reserve space */
+/* Specific Button for Process Text - Floating Style */
+#process-text-btn {
+    position: absolute; /* Position relative to wrapper */
+    bottom: 12px; /* Adjust spacing from bottom */
+    right: 12px; /* Adjust spacing from right */
+    background: linear-gradient(145deg, #45a68d, #3a8d77); /* Gradient background */
+    color: #ffffff;
+    border: none;
+    border-radius: 50px; /* Make it round */
+    width: 36px; /* Slightly smaller */
+    height: 36px; /* Slightly smaller */
+    padding: 0; /* Remove padding */
+    margin: 0; /* Remove margin */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0,0,0,0.2); /* Add shadow */
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease; /* Add transform transition */
+    font-size: 1.1rem; /* Adjust icon size */
+    cursor: pointer; /* Ensure cursor is pointer */
 }
 
-.status-success {
-    color: #28a745; /* Green */
+#process-text-btn:hover {
+    background: linear-gradient(145deg, #50bdaa, #45a68d); /* Lighter gradient on hover */
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.35), 0 2px 4px rgba(0,0,0,0.25);
+    transform: translateY(-2px); /* Slight lift effect */
 }
 
-.status-error {
-    color: #dc3545; /* Red */
+/* Simple arrow icon placeholder */
+#process-text-btn::before {
+    content: '➤'; /* Use a right-pointing arrow or similar */
+    line-height: 1; /* Ensure proper vertical alignment */
 }
 
-.status-loading {
-    color: #007bff; /* Blue */
+/* Remove the old ::after rule */
+#process-text-btn::after {
+    content: '';
 }
 
-/* Expenses Section */
+/* Expenses List Section */
+#expenses-list-section {
+    margin: 0;
+    background-color: #252526; /* Match header */
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #3a3a3a;
+}
+
+/* Search Input */
 .search-container {
     margin-bottom: 1rem;
 }
 
 #search-input {
-    padding: 8px 12px;
-    width: 300px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    width: 100%; /* Full width */
+    box-sizing: border-box; /* Include padding/border in width */
+    padding: 0.6rem 1rem;
+    border: 1px solid #3a3a3a;
+    border-radius: 6px;
+    background-color: #1e1e1e; /* Darker background */
+    color: #e0e0e0;
+    font-size: 0.9rem;
 }
 
-/* Expenses Table */
+#search-input:focus {
+    outline: none;
+    border-color: #4a90e2;
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+}
+
+/* Table Container */
+.table-container {
+    overflow-x: auto; /* Allow horizontal scroll if needed */
+}
+
+/* Table */
 table {
     width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
+    border-collapse: separate; /* Use separate for border-radius */
+    border-spacing: 0;
+    margin: 0;
+    font-size: 0.9rem;
+    background-color: #1e1e1e; /* Darker table background */
+    border: 1px solid #3a3a3a;
+    border-radius: 6px;
+    overflow: hidden; /* Clip content to border-radius */
 }
 
 th, td {
-    border: 1px solid #ddd;
-    padding: 10px 12px;
+    border: none; /* Remove individual borders */
+    border-bottom: 1px solid #3a3a3a; /* Border between rows */
+    padding: 0.75rem 1rem; /* Increased padding */
     text-align: left;
+    white-space: nowrap; /* Prevent wrapping */
 }
 
-thead {
-    background-color: #e9ecef; /* Light gray */
-    color: #495057;
+td {
+    color: #c0c0c0;
 }
 
-thead th {
+th {
+    background-color: #2f2f30; /* Darker header */
+    color: #f0f0f0;
+    font-weight: 500;
     cursor: pointer;
-    user-select: none; /* Prevent text selection on click */
+    position: sticky; /* Keep header visible */
+    top: 0; /* Stick to top of scrollable container */
+    z-index: 10;
+    border-bottom: 1px solid #4a4a4a; /* Stronger header border */
 }
 
-thead th:hover {
-    background-color: #ced4da;
+/* Remove bottom border from last row */
+tr:last-child td {
+    border-bottom: none;
 }
 
-tbody tr:nth-child(odd) {
-    background-color: #f8f9fa;
+tr {
+    transition: background-color 0.15s ease;
 }
 
-tbody tr:hover {
-    background-color: #e2e6ea;
+tr:hover td {
+    background-color: #2a2a2b; /* Subtle row hover */
 }
 
-#expenses-table tbody tr.expense-income {
-    background-color: #e6ffed; /* Light green background */
+/* Column Widths */
+th[data-sort="date"],
+td:nth-child(1) { /* Target first column (Date) */
+    width: 120px; /* Fixed width for Date */
+    min-width: 120px;
+    white-space: nowrap;
 }
 
-#expenses-table tbody tr.expense-income:hover {
-    background-color: #d1f9e0; /* Slightly darker green on hover */
+th[data-sort="value"],
+td:nth-child(3) { /* Target third column (Value) */
+    width: 150px; /* Fixed width for Value */
+    min-width: 150px;
+    text-align: right; /* Align numbers (and header) to the right */
+    white-space: nowrap;
 }
 
-#expenses-table th[data-sort] {
-    cursor: pointer;
-    position: relative; /* Needed for absolute positioning of pseudo-elements */
+th[data-sort="description"],
+td:nth-child(2) { /* Target second column (Description) */
+    width: 100%; /* Allow description to take remaining space */
+    white-space: normal; /* Allow wrapping for long descriptions */
 }
 
-#expenses-table th[data-sort]::after {
-    content: ''; /* Empty content, background/border will create the arrow */
-    position: absolute;
-    right: 10px; /* Adjust as needed */
-    top: 50%;
-    transform: translateY(-50%);
-    border: 5px solid transparent; /* Size of the arrow */
-    opacity: 0.5; /* Make default indicator subtle */
-    /* Default triangle pointing down slightly (for unsorted state or baseline) */
-    /* border-top-color: #ccc; 
-       You can uncomment this if you want a default subtle indicator */
+/* Sort Icons */
+.sort-icon {
+    font-family: 'Arial'; /* Placeholder, replace with actual icons */
+    display: inline-block;
+    margin-left: 8px;
+    color: #888;
+    width: 1em;
+    text-align: center;
+    opacity: 0.6;
 }
 
-#expenses-table th.sort-asc::after {
-    border-bottom-color: #333; /* Arrow pointing up */
-    border-top-color: transparent;
+th.sort-asc .sort-icon, th.sort-desc .sort-icon {
     opacity: 1;
+    color: #e0e0e0;
 }
 
-#expenses-table th.sort-desc::after {
-    border-top-color: #333; /* Arrow pointing down */
-    border-bottom-color: transparent;
-    opacity: 1;
+th.sort-asc .sort-icon::after {
+    content: '▲'; /* Up arrow */
 }
 
-/* Responsive adjustments (example) */
-@media (max-width: 768px) {
-    #input-section {
-        grid-template-columns: 1fr; /* Stack input areas on smaller screens */
-    }
-
-    #search-input {
-        width: calc(100% - 24px);
-    }
+th.sort-desc .sort-icon::after {
+    content: '▼'; /* Down arrow */
 }
 
-/* --- Debug Menu Styles --- */
-#debug-button {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background-color: #ffc107; /* Warning yellow */
-    color: #333;
-    border: 1px solid #e0a800;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    font-size: 24px;
+/* Status Messages */
+.status-message {
+    padding: 0.6rem 1rem;
+    margin-top: 0.8rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    text-align: center;
+    display: none;
+}
+
+.status-loading {
+    background-color: #444;
+    color: #e0e0e0;
+    display: block;
+}
+
+.status-success {
+    background-color: #3a5f3a;
+    color: #e0e0e0;
+    display: block;
+}
+
+.status-error {
+    background-color: #6b3a3a;
+    color: #e0e0e0;
+    display: block;
+}
+
+/* Footer */
+footer {
+    background-color: #1e1e1e;
+    color: #888;
+    padding: 12px 20px;
+    text-align: center;
+    border-top: 1px solid #333;
+}
+
+.footer-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.sample-files, .footer-links {
     display: flex;
     align-items: center;
-    justify-content: center;
+    gap: 10px;
+    font-size: 0.9rem;
+}
+
+.sample-files span, .footer-links span {
+    color: #666;
+}
+
+.sample-files .separator, .footer-links .separator {
+    color: #444;
+}
+
+.sample-files a, .footer-links a, #debug-button {
+    color: #8ab4f8;
+    text-decoration: none;
+    transition: color 0.2s ease;
+    font-size: 0.9rem;
+}
+
+.sample-files a:hover, .footer-links a:hover, #debug-button:hover {
+    color: #b3ceff;
+    text-decoration: underline;
+}
+
+footer p {
+    margin: 0;
+}
+
+/* Debug Menu Styles */
+#debug-button {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
     cursor: pointer;
-    z-index: 1000; /* Ensure it's above other content */
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    transition: background-color 0.2s ease;
+    font-size: 0.9rem;
+    box-shadow: none;
 }
 
 #debug-button:hover {
-    background-color: #e0a800;
+    background: none;
+    transform: none;
 }
 
 #debug-menu {
     position: fixed;
-    bottom: 70px; /* Position above the button */
+    bottom: 90px; /* Adjust for footer and button */
     right: 20px;
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background-color: #333;
+    border: 1px solid #555;
     border-radius: 5px;
     padding: 15px;
     width: 250px;
     box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-    z-index: 999; /* Below button until shown */
+    z-index: 999;
     transition: opacity 0.3s ease, visibility 0.3s ease;
+    color: #ccc;
 }
 
 #debug-menu.hidden {
@@ -269,11 +534,13 @@ tbody tr:hover {
     visibility: hidden;
 }
 
-#debug-menu h3 {
+#debug-menu h4 {
     margin-top: 0;
     margin-bottom: 10px;
     font-size: 16px;
-    color: #495057;
+    color: #eee;
+    border-bottom: 1px solid #555;
+    padding-bottom: 5px;
 }
 
 #debug-menu button {
@@ -281,32 +548,65 @@ tbody tr:hover {
     width: 100%;
     padding: 8px 10px;
     margin-bottom: 10px;
-    border: 1px solid #ced4da;
+    border: 1px solid #555;
     border-radius: 4px;
-    background-color: #e9ecef;
-    color: #495057;
+    background-color: #444;
+    color: #ccc;
     cursor: pointer;
     transition: background-color 0.2s ease;
 }
 
 #debug-menu button:hover {
-    background-color: #dee2e6;
+    background-color: #555;
 }
 
 #debug-menu button#clean-db-btn {
-    background-color: #dc3545; /* Danger red */
+    background-color: #a04040; /* Darker red */
     color: white;
-    border-color: #dc3545;
+    border-color: #803030;
 }
 
 #debug-menu button#clean-db-btn:hover {
-    background-color: #c82333;
-    border-color: #bd2130;
+    background-color: #803030;
+    border-color: #602020;
 }
 
 #debug-menu #debug-status {
     font-size: 12px;
     margin-top: 5px;
-    min-height: 15px; /* Reserve space */
+    min-height: 15px;
 }
-/* --- End Debug Menu Styles --- */ 
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    #app-layout {
+        flex-direction: column;
+    }
+    #left-sidebar, #right-sidebar {
+        display: none; /* Ensure hidden on mobile too */
+    }
+    #main-content {
+        padding: 1rem;
+    }
+    .input-boxes-container {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    #input-section, #expenses-list-section {
+        padding: 1rem;
+    }
+    .drop-zone, #text-input {
+        height: 120px;
+    }
+    th, td {
+        padding: 0.6rem 0.8rem;
+        white-space: normal; /* Allow wrapping on mobile */
+    }
+    h2 {
+        font-size: 1.2rem;
+    }
+}
+
+.positive-value {
+    background-color: rgba(0, 255, 0, 0.05); /* Very light green background */
+} 
