@@ -78,11 +78,34 @@
                                 <span id="expenses-sum-in" class="stat-income">Inc: $0.00</span>
                                 <span class="stat-separator">|</span>
                                 <span id="expenses-sum-net" class="stat-net">Net: $0.00</span>
+                                <span class="stat-separator">|</span>
+                                <button id="export-btn" class="stat-export">📊 Export</button>
                             </span>
                         </h2>
-                        <div class="search-container">
-                            <input type="text" id="search-input" placeholder="Search expenses...">
+                        <div class="expenses-header-controls">
+                            <div class="search-container">
+                                <input type="text" id="search-input" placeholder="Search expenses...">
+                            </div>
                         </div>
+
+                        <!-- Export Modal -->
+                        <div id="export-modal" class="modal">
+                            <div class="modal-content">
+                                <h3>Export Expenses</h3>
+                                <div class="export-options">
+                                    <button id="export-csv" class="export-option">
+                                        <span class="export-icon">📄</span>
+                                        <span class="export-text">Export as CSV</span>
+                                    </button>
+                                    <button id="export-xls" class="export-option">
+                                        <span class="export-icon">📊</span>
+                                        <span class="export-text">Export as XLS</span>
+                                    </button>
+                                </div>
+                                <button id="close-export-modal" class="close-modal">✕</button>
+                            </div>
+                        </div>
+
                         <div class="table-container">
                             <table>
                                 <thead>

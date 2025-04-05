@@ -74,12 +74,14 @@ async def get_expenses(
         raise HTTPException(status_code=500, detail="An unexpected server error occurred while fetching expenses.")
 
 @router.post("/upload-file", summary="Process Expense File", description="Uploads a single CSV or TXT file, processes it, and stores the expenses.")
-async def upload_expense_file(collection: ExpensesCollectionDep, file: UploadFile = File(...)):
+async def upload_expense_file(request: Request, file: UploadFile = File(...)):
     """
     Handles uploading of a single expense file (.csv, .txt).
     Validates file, sends to service for processing and storage using the injected DB collection.
     """
-    logger.info(f"POST /upload-file endpoint called for file: {file.filename}")
+    collection = get_expenses_collection(request)
+    save_at_front = request.state.save_at_front # Get flag from request state
+    logger.info(f"POST /upload-file endpoint called for file: {file.filename} - SaveAtFront: {save_at_front}") # Log the flag
     
     # Basic content type check (more robust checks in service)
     if not file.content_type in ["text/csv", "text/plain"] and not file.filename.lower().endswith(('.csv', '.txt')):
@@ -87,8 +89,8 @@ async def upload_expense_file(collection: ExpensesCollectionDep, file: UploadFil
         raise HTTPException(status_code=400, detail=f"Invalid file type: {file.content_type}. Please upload CSV or TXT.")
     
     try:
-        # Call service layer for processing, passing the collection
-        result = await expenses_service.process_uploaded_file(collection, file)
+        # Call service layer for processing, passing the collection AND the flag
+        result = await expenses_service.process_uploaded_file(collection, file, save_at_front=save_at_front)
         logger.info(f"File {file.filename} processed. Result: {result}")
 
         # Determine appropriate status code based on service result
@@ -118,19 +120,21 @@ async def upload_expense_file(collection: ExpensesCollectionDep, file: UploadFil
         await file.close() # Ensure file is closed
 
 @router.post("/process-text", summary="Process Expense Text", description="Processes raw text input containing expense data using AI and stores it.")
-async def process_expense_text(collection: ExpensesCollectionDep, text_input: Annotated[TextInput, Body(...)]):
+async def process_expense_text(request: Request, text_input: Annotated[TextInput, Body(...)]):
     """
     Handles direct text input for expense processing using the injected DB collection.
     Sends text to service layer for AI processing and storage.
     """
-    logger.info(f"POST /process-text endpoint called with text: {text_input.text_input[:50]}...")
+    collection = get_expenses_collection(request)
+    save_at_front = request.state.save_at_front # Get flag from request state
+    logger.info(f"POST /process-text endpoint called with text: {text_input.text_input[:50]}... - SaveAtFront: {save_at_front}") # Log the flag
     
     if not text_input.text_input or not text_input.text_input.strip():
         raise HTTPException(status_code=400, detail="Text input cannot be empty.")
 
     try:
-        # Call service layer for processing, passing the collection
-        result = await expenses_service.process_text_input(collection, text_input.text_input)
+        # Call service layer for processing, passing the collection AND the flag
+        result = await expenses_service.process_text_input(collection, text_input.text_input, save_at_front=save_at_front)
         logger.info(f"Text input processed. Result: {result}")
 
         # Determine status code similar to file upload
@@ -175,8 +179,10 @@ async def delete_all_expenses_route(collection: ExpensesCollectionDep):
         raise HTTPException(status_code=500, detail="An unexpected server error occurred while deleting expenses.")
 
 @router.post("/expenses/clear")
-async def clear_database(collection: ExpensesCollectionDep):
+async def clear_database(request: Request):
     """API endpoint to clear all expenses from the database."""
+    collection = get_expenses_collection(request)
+    # No need to pass save_at_front for clearing
     logger.warning("POST /expenses/clear endpoint called. This will clear the database.")
     try:
         result = await expenses_service.delete_all_expenses(collection)

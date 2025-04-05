@@ -85,6 +85,7 @@ MONGODB_URI = os.getenv("MONGODB_URI")
 DB_NAME = os.getenv("DB_NAME", "finance_db") # Default DB name if not set
 MAX_UPLOAD_SIZE = 1 * 1024 * 1024  # 1MB limit
 UPLOAD_ENDPOINT_PATH = "/api/upload" # Define the upload path constant
+SAVE_AT_FRONT = os.getenv("SAVE_AT_FRONT", "false").lower() == "true" # Read SAVE_AT_FRONT
 
 if not MONGODB_URI:
     logger.error("MONGODB_URI environment variable not set! Database connection will fail.")
@@ -131,6 +132,9 @@ async def lifespan(app: FastAPI):
         app_state["db"] = app_state["db_client"][DB_NAME]
         app_state["expenses_collection"] = app_state["db"].get_collection("expenses")
         logger.info(f"Successfully connected to MongoDB database: {DB_NAME}")
+        # Store SAVE_AT_FRONT in app state
+        app_state["save_at_front"] = SAVE_AT_FRONT
+        logger.info(f"Configuration: SAVE_AT_FRONT = {SAVE_AT_FRONT}")
         await app_state["db_client"].admin.command('ping')
         logger.info("MongoDB ping successful.")
     except Exception as e:
@@ -191,17 +195,17 @@ app.mount("/", StaticFiles(directory="public", html=True), name="static")
 
 # Make app state accessible via middleware
 @app.middleware("http")
-async def add_db_to_request(request, call_next):
+async def add_app_config_to_request(request: Request, call_next):
+    """Adds database connection and configuration settings to the request state."""
     request.state.db_client = app_state.get("db_client")
     request.state.db = app_state.get("db")
     request.state.expenses_collection = app_state.get("expenses_collection")
+    request.state.save_at_front = app_state.get("save_at_front", False) # Add save_at_front
     response = await call_next(request)
     return response
 
 # Removed old root endpoint - StaticFiles serves index.html at "/"
 # @app.get("/")
-# async def read_root():
-#     return {"message": "Welcome to the Finance Manager API"}
 
 # Removed startup/shutdown event handlers as lifespan is preferred
 

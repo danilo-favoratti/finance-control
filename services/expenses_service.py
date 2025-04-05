@@ -40,24 +40,26 @@ async def get_all_expenses_from_db(collection: AsyncIOMotorCollection, sort_by: 
     return expenses
 
 async def add_multiple_expenses_to_db(
-    collection: AsyncIOMotorCollection, 
+    collection: AsyncIOMotorCollection,
     expenses_data: List[Dict[str, Any]],
-    invert_signs: bool = False # New parameter to indicate if signs should be flipped
+    invert_signs: bool = False, # Existing parameter
+    save_at_front: bool = False # New parameter
 ) -> Dict[str, Any]:
-    """Adds multiple expense documents to the MongoDB collection after validation."""
+    """Adds multiple expense documents to the MongoDB collection after validation, or skips DB saving if save_at_front is True."""
     if not expenses_data:
-        return {"status": "no_data", "added_count": 0, "skipped_count": 0, "errors": [], "duplicates_info": [], "inserted_ids": []}
-        
-    logger.info(f"Attempting to add {len(expenses_data)} expenses to collection '{collection.name}'.")
+        # Return structure now includes 'processed_expenses' which is empty here
+        return {"status": "no_data", "added_count": 0, "skipped_count": 0, "errors": [], "duplicates_info": [], "inserted_ids": [], "processed_expenses": []}
+
+    logger.info(f"Attempting to process {len(expenses_data)} expenses. Save to DB: {not save_at_front}")
     added_count = 0
     skipped_count = 0
     errors = []
-    valid_expenses_for_db = []
+    valid_expense_models = [] # Store validated Pydantic models
     skipped_duplicates_info = [] # Store info about duplicates skipped
 
     for item_index, expense_data in enumerate(expenses_data):
         # Pretty print the dictionary using json.dumps for readability
-        logger.debug(f"Processing item #{item_index}:\n{json.dumps(expense_data, indent=2, default=str)}") 
+        logger.debug(f"Processing item #{item_index}:\n{json.dumps(expense_data, indent=2, default=str)}")
         try:
             # Data Cleaning/Preparation
             if 'id' in expense_data: del expense_data['id'] # Remove any incoming ID
@@ -74,44 +76,34 @@ async def add_multiple_expenses_to_db(
                     errors.append(f"Item #{item_index} ({expense_data.get('description', '')[:20]}...): Invalid date format.")
                     continue
             elif isinstance(date_input, date):
-                # Already a date object (e.g., direct input if we add that later)
                 parsed_date = date_input
-            # If it's neither a valid string nor a date, it's an error
-            elif date_input is not None: # Allow None if Optional is used
+            elif date_input is not None:
                  logger.warning(f"Skipping item #{item_index} due to unexpected date type: {type(date_input)}")
                  errors.append(f"Item #{item_index} ({expense_data.get('description', '')[:20]}...): Invalid date type.")
                  continue
-            
-            # Update the dict with the parsed date object, or None
-            expense_data['date'] = parsed_date
-            # Note: Pydantic validation later will fail if date is None and the model requires it.
-            # Our Expense model allows Optional[date], handled by Pydantic. Let's ensure it aligns.
-            # The DB model Expense expects date: date, so None might fail validation here.
-            # Let's re-check models/expense.py
 
-            # --> Correction based on Expense model: date is required (not Optional[date])
             if parsed_date is None:
                  logger.warning(f"Skipping item #{item_index} due to missing or unparseable date.")
                  errors.append(f"Item #{item_index} ({expense_data.get('description', '')[:20]}...): Missing or unparseable date.")
                  continue
             else:
+                # Keep the date object for Pydantic validation
                 expense_data['date'] = parsed_date
-            
-            # Check for Duplicates before Pydantic validation (using core fields)
-            # Convert date back to datetime for MongoDB query if needed
-            query_date = datetime.combine(parsed_date, datetime.min.time())
-            duplicate_check_filter = {
-                "date": query_date,
-                "description": expense_data.get("description"),
-                "value": expense_data.get("value") # Value should be consistent now
-            }
-            existing_doc = await collection.find_one(duplicate_check_filter)
-            if existing_doc:
-                logger.warning(f"Skipping item #{item_index} as duplicate found: {duplicate_check_filter}")
-                skipped_count += 1
-                # Store minimal info about the duplicate
-                skipped_duplicates_info.append(f"Dup: {expense_data.get('date')} - {expense_data.get('description', '')[:20]}...")
-                continue # Skip to next item
+
+            # Duplicate Check: Only if saving to DB
+            if not save_at_front:
+                query_date = datetime.combine(parsed_date, datetime.min.time())
+                duplicate_check_filter = {
+                    "date": query_date,
+                    "description": expense_data.get("description"),
+                    "value": expense_data.get("value")
+                }
+                existing_doc = await collection.find_one(duplicate_check_filter)
+                if existing_doc:
+                    logger.warning(f"Skipping item #{item_index} as duplicate found (DB check): {duplicate_check_filter}")
+                    skipped_count += 1
+                    skipped_duplicates_info.append(f"DupDB: {expense_data.get('date')} - {expense_data.get('description', '')[:20]}...")
+                    continue # Skip to next item
 
             # Value handling
             value_input = expense_data.get('value')
@@ -128,19 +120,16 @@ async def add_multiple_expenses_to_db(
             
             # Pydantic Validation
             expense_model = Expense(**expense_data)
-            expense_dict = expense_model.model_dump(exclude_none=True)
 
-            # Apply sign inversion if needed BEFORE converting date for DB
+            # Apply sign inversion if needed (acts on the model data)
             if invert_signs:
                 logger.debug(f"Inverting sign for item #{item_index} based on pre-analysis.")
-                expense_dict['value'] *= -1
-                # Also update in_out if it was derived from the original value
-                expense_dict['in_out'] = 'in' if expense_dict['value'] >= 0 else 'out'
+                expense_model.value *= -1
+                expense_model.in_out = 'in' if expense_model.value >= 0 else 'out'
 
-            # Convert date to datetime for MongoDB
-            expense_dict['date'] = datetime.combine(expense_model.date, datetime.min.time())
-            valid_expenses_for_db.append(expense_dict)
-            logger.debug(f"Item #{item_index} validated successfully.") # Log successful validation
+            # Add the validated *model* to our list
+            valid_expense_models.append(expense_model)
+            logger.debug(f"Item #{item_index} validated successfully.")
 
         except ValidationError as e:
             logger.warning(f"Skipping item #{item_index} due to validation error: {e}")
@@ -148,32 +137,65 @@ async def add_multiple_expenses_to_db(
         except Exception as e:
             logger.error(f"Unexpected error processing item #{item_index}: {e}")
             errors.append(f"Item #{item_index} ({expense_data.get('description', '')[:20]}...): Unexpected processing error.")
-    
-    # Bulk insert valid documents
-    inserted_ids = []
-    if valid_expenses_for_db:
-        try:
-            result = await collection.insert_many(valid_expenses_for_db, ordered=False) # ordered=False continues on errors
-            added_count = len(result.inserted_ids)
-            inserted_ids = [str(oid) for oid in result.inserted_ids]
-            logger.info(f"Bulk insert successful. Added {added_count} expenses.")
-        except Exception as e:
-            logger.error(f"Database error during bulk insert: {e}")
-            # If bulk insert fails entirely, add a general error
-            errors.append(f"Database error during bulk insert: {e}")
-            # Potentially, some might have been inserted before the error if ordered=False
-            # You might need more complex logic to determine partial success here.
-            added_count = 0 # Assume none were added if the operation fails
 
-    logger.info(f"Finished adding multiple expenses. Added: {added_count}, Errors: {len(errors)}, Skipped: {skipped_count}")
-    status = "partial_success" if errors and added_count > 0 else ("success" if not errors else "error")
+    # --- Conditional DB Insertion ---
+    inserted_ids = []
+    if not save_at_front and valid_expense_models:
+        # Prepare data for DB (convert date back to datetime, dump model)
+        valid_expenses_for_db = []
+        for model in valid_expense_models:
+             expense_dict = model.model_dump(exclude_none=True)
+             # Convert date to datetime for MongoDB JUST before insertion
+             expense_dict['date'] = datetime.combine(model.date, datetime.min.time())
+             valid_expenses_for_db.append(expense_dict)
+
+        if valid_expenses_for_db:
+             logger.info(f"Attempting bulk insert of {len(valid_expenses_for_db)} valid expenses into DB.")
+             try:
+                 result = await collection.insert_many(valid_expenses_for_db, ordered=False)
+                 added_count = len(result.inserted_ids)
+                 inserted_ids = [str(oid) for oid in result.inserted_ids]
+                 logger.info(f"Bulk insert successful. Added {added_count} expenses to DB.")
+             except Exception as e:
+                 logger.error(f"Database error during bulk insert: {e}")
+                 errors.append(f"Database error during bulk insert: {e}")
+                 added_count = 0 # Assume none were added if the operation fails
+        else:
+             logger.info("No valid expenses to insert into DB.")
+
+    elif save_at_front:
+        logger.info("Skipping database insertion because SAVE_AT_FRONT is True.")
+        added_count = 0 # No items added *to the database*
+    else: # Not saving at front, but valid_expense_models was empty
+         logger.info("No valid expenses were processed.")
+
+    # Determine overall status
+    final_status = "error"
+    if not errors and (added_count > 0 or save_at_front): # Success if no errors AND (added to db OR skipped db intentionally)
+        final_status = "success"
+    elif errors and (added_count > 0 or (save_at_front and valid_expense_models)): # Partial if errors AND (some added to db OR some processed when skipping db)
+        final_status = "partial_success"
+    elif not valid_expense_models and not errors: # No data if nothing valid was found and no errors
+        final_status = "no_data"
+    # else remains "error"
+
+    logger.info(f"Finished processing expenses. Status: {final_status}, Added to DB: {added_count}, Processed: {len(valid_expense_models)}, Errors: {len(errors)}, Skipped Dups (DB): {skipped_count}")
+
+    # Convert Pydantic models to dicts for the JSON response
+    # Make sure date is in 'YYYY-MM-DD' string format for JSON consistency
+    processed_expenses_for_response = [
+        expense.model_dump(mode='json') for expense in valid_expense_models
+    ]
+
     return {
-        "status": status,
-        "added_count": added_count,
-        "skipped_count": skipped_count, # Add skipped count
+        "status": final_status,
+        "added_count": added_count, # Count of items added to DB
+        "processed_count": len(valid_expense_models), # Count of items successfully processed
+        "skipped_count": skipped_count,
         "errors": errors,
-        "duplicates_info": skipped_duplicates_info, # Add skipped info
-        "inserted_ids": inserted_ids
+        "duplicates_info": skipped_duplicates_info,
+        "inserted_ids": inserted_ids, # Will be empty if save_at_front is True
+        "processed_expenses": processed_expenses_for_response # The actual processed data
     }
 
 async def delete_all_expenses(collection: AsyncIOMotorCollection) -> Dict[str, Any]:
@@ -194,25 +216,29 @@ async def clear_database(collection: AsyncIOMotorCollection) -> Dict[str, Any]:
 
 # --- File/Text Processing Functions --- 
 
-async def process_uploaded_file(collection: AsyncIOMotorCollection, file: UploadFile) -> Dict[str, Any]:
+async def process_uploaded_file(
+    collection: AsyncIOMotorCollection,
+    file: UploadFile,
+    save_at_front: bool # Add parameter
+) -> Dict[str, Any]:
     """
     Processes an uploaded file (CSV or TXT).
     - Reads file content.
     - Sends content to OpenAI agent for processing.
     - Validates extracted data.
-    - Stores valid data in the database using the provided collection.
-    - Returns a dictionary summarizing the result.
+    - Stores valid data in the database using the provided collection *unless* save_at_front is True.
+    - Returns a dictionary summarizing the result including processed data.
     """
-    logger.info(f"Processing uploaded file: {file.filename}, type: {file.content_type}")
+    logger.info(f"Processing uploaded file: {file.filename}, type: {file.content_type}, SaveAtFront: {save_at_front}")
     extracted_data = []
     try:
         content = await file.read()
         logger.info(f"Read {len(content)} bytes from {file.filename}.")
         if not content:
              logger.warning(f"Uploaded file {file.filename} is empty.")
-             return {"status": "error", "message": "File is empty.", "added_count": 0, "errors": ["File is empty."]}
+             # Ensure return structure matches add_multiple_expenses_to_db
+             return {"status": "error", "message": "File is empty.", "added_count": 0, "processed_count": 0, "errors": ["File is empty."], "processed_expenses": []}
 
-        # Process all files as text
         try:
             text_content = content.decode('utf-8')
             logger.info(f"Decoded file content (first 100 chars): {text_content[:100]}...")
@@ -231,15 +257,21 @@ async def process_uploaded_file(collection: AsyncIOMotorCollection, file: Upload
             logger.error(f"AI Connection error processing file {file.filename}: {e}")
             raise # Re-raise connection errors to be handled by the route
         
-        # Add data to DB
+        # Process/Add data
         if not extracted_data:
-            logger.info(f"No data extracted from {file.filename}. Nothing to add to DB.")
-            return {"status": "success", "message": "No actionable data found in file.", "added_count": 0, "errors": []}
-            
-        logger.info(f"Adding {len(extracted_data)} items from {file.filename} to the database...")
-        # Pass the determined sign inversion flag to the DB function
-        db_result = await add_multiple_expenses_to_db(collection, extracted_data, invert_signs=invert_signs_needed)
-        return db_result # Return the result from the DB adding function
+            logger.info(f"No data extracted from {file.filename}. Nothing to process.")
+            # Ensure return structure matches
+            return {"status": "success", "message": "No actionable data found in file.", "added_count": 0, "processed_count": 0, "errors": [], "processed_expenses": []}
+
+        logger.info(f"Processing {len(extracted_data)} items from {file.filename} (SaveToDB: {not save_at_front})...")
+        # Pass the determined sign inversion flag AND save_at_front flag to the processing function
+        db_result = await add_multiple_expenses_to_db(
+            collection,
+            extracted_data,
+            invert_signs=invert_signs_needed,
+            save_at_front=save_at_front # Pass the flag here
+        )
+        return db_result # Return the result which now includes processed_expenses
 
     except ValueError as ve:
         logger.error(f"ValueError processing file {file.filename}: {ve}")
@@ -248,15 +280,19 @@ async def process_uploaded_file(collection: AsyncIOMotorCollection, file: Upload
         logger.exception(f"Unexpected error processing file {file.filename}: {e}")
         raise ConnectionError(f"Unexpected server error processing file {file.filename}.")
 
-async def process_text_input(collection: AsyncIOMotorCollection, text_data: str) -> Dict[str, Any]:
+async def process_text_input(
+    collection: AsyncIOMotorCollection,
+    text_data: str,
+    save_at_front: bool # Add parameter
+) -> Dict[str, Any]:
     """
     Processes raw text input using the OpenAI agent.
     - Sends text to OpenAI agent.
     - Validates extracted data.
-    - Stores valid data in the database using the provided collection.
-    - Returns a dictionary summarizing the result.
+    - Stores valid data in the database using the provided collection *unless* save_at_front is True.
+    - Returns a dictionary summarizing the result including processed data.
     """
-    logger.info(f"Processing text input (length: {len(text_data)})...")
+    logger.info(f"Processing text input (length: {len(text_data)}), SaveAtFront: {save_at_front}...")
     if not text_data or not text_data.strip():
         logger.warning("Received empty text input.")
         raise ValueError("Text input cannot be empty.")
@@ -271,12 +307,18 @@ async def process_text_input(collection: AsyncIOMotorCollection, text_data: str)
         logger.info(f"AI agent returned {len(extracted_data)} items from text input.")
         
         if not extracted_data:
-            logger.info("AI agent returned no data from text input. Nothing to add to DB.")
-            return {"status": "success", "message": "No actionable data found in text.", "added_count": 0, "errors": []}
+            logger.info("AI agent returned no data from text input. Nothing to process.")
+            # Ensure return structure matches
+            return {"status": "success", "message": "No actionable data found in text.", "added_count": 0, "processed_count": 0, "errors": [], "processed_expenses": []}
 
-        logger.info(f"Adding {len(extracted_data)} items from text input to the database...")
-        # Pass the determined sign inversion flag to the DB function
-        db_result = await add_multiple_expenses_to_db(collection, extracted_data, invert_signs=invert_signs_needed)
+        logger.info(f"Processing {len(extracted_data)} items from text input (SaveToDB: {not save_at_front})...")
+        # Pass the determined sign inversion flag AND save_at_front flag to the processing function
+        db_result = await add_multiple_expenses_to_db(
+            collection,
+            extracted_data,
+            invert_signs=invert_signs_needed,
+            save_at_front=save_at_front # Pass the flag here
+        )
         return db_result
     # Added except clauses to fix linter errors
     except ConnectionError as e: 
