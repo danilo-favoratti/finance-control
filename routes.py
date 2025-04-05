@@ -1,6 +1,6 @@
 """API Routes for expenses"""
-from fastapi import APIRouter, UploadFile, File, HTTPException, Body, Depends, Request
-from typing import List, Annotated
+from fastapi import APIRouter, UploadFile, File, HTTPException, Body, Depends, Request, Query
+from typing import List, Annotated, Optional
 from services import expenses_service # Import the service module
 from models.expense import Expense # Import the Pydantic model
 from motor.motor_asyncio import AsyncIOMotorCollection # For type hinting
@@ -29,20 +29,49 @@ ExpensesCollectionDep = Annotated[AsyncIOMotorCollection, Depends(get_expenses_c
 
 # --- API Routes --- 
 
-@router.get("/expenses", response_model=List[Expense], summary="Get All Expenses", description="Retrieves all stored expense records, sorted by date descending.")
-async def get_expenses(collection: ExpensesCollectionDep):
-    """Retrieve all expenses, using the injected DB collection."""
-    logger.info("GET /expenses endpoint called")
+@router.get("/expenses", response_model=List[Expense], summary="Get All Expenses", description="Retrieves all expense records from the database, sorted by date descending by default.")
+async def get_expenses(
+    collection: ExpensesCollectionDep,
+    sort_by: Optional[str] = Query('date', description="Field to sort by (e.g., 'date', 'value')."), 
+    sort_order: Optional[int] = Query(-1, description="Sort order: 1 for ascending, -1 for descending.")
+) -> List[Expense]:
+    """
+    Fetches all expenses, allowing sorting via query parameters.
+    """
+    # --- TEMPORARY DIAGNOSTIC LOG --- 
+    # logger.info("--- Executing CORRECT get_expenses definition (no 'func' parameter) ---") 
+    # --- END TEMPORARY LOG ---
+    
+    # --- TEMPORARILY RETURN HARDCODED DATA (Removed) --- 
+    # logger.info("--- Returning HARDCODED test data --- ")
+    # return [
+    #     {"id": "test1", "date": "2024-01-01", "description": "Test Expense 1", "value": -10.50, "in_out": "out"},
+    #     {"id": "test2", "date": "2024-01-02", "description": "Test Income 2", "value": 100.00, "in_out": "in"}
+    # ]
+    # --- END TEMPORARY HARDCODED DATA --- 
+
+    # Original logic below (Restored):
+    logger.info(f"GET /expenses endpoint called. Sorting by '{sort_by}' order '{sort_order}'")
     try:
-        # Pass the collection to the service function
-        expenses = await expenses_service.get_all_expenses_from_db(collection, sort_by='date', sort_order=-1)
+        # Validate sort_by if necessary (e.g., ensure it's a valid field)
+        # Basic validation example:
+        allowed_sort_fields = ['date', 'description', 'value', 'in_out']
+        if sort_by not in allowed_sort_fields:
+            raise HTTPException(status_code=400, detail=f"Invalid sort_by field. Allowed fields: {', '.join(allowed_sort_fields)}")
+            
+        # Validate sort_order
+        if sort_order not in [1, -1]:
+             raise HTTPException(status_code=400, detail="Invalid sort_order value. Use 1 for ascending or -1 for descending.")
+
+        # Pass validated parameters to the service layer
+        expenses = await expenses_service.get_all_expenses_from_db(collection, sort_by=sort_by, sort_order=sort_order)
         return expenses
-    except ConnectionError as e:
-        logger.error(f"Connection error in GET /expenses: {e}")
-        raise HTTPException(status_code=503, detail=str(e)) # 503 Service Unavailable
+    except ConnectionError as ce:
+        logger.error(f"Connection error fetching expenses: {ce}")
+        raise HTTPException(status_code=503, detail=f"Database connection error: {ce}")
     except Exception as e:
-        logger.exception(f"Unexpected error in GET /expenses: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error fetching expenses.")
+        logger.exception(f"Unexpected error fetching expenses: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected server error occurred while fetching expenses.")
 
 @router.post("/upload-file", summary="Process Expense File", description="Uploads a single CSV or TXT file, processes it, and stores the expenses.")
 async def upload_expense_file(collection: ExpensesCollectionDep, file: UploadFile = File(...)):

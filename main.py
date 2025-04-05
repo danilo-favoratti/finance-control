@@ -1,7 +1,7 @@
 """Main FastAPI application"""
 import os
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
@@ -10,9 +10,17 @@ from dotenv import load_dotenv
 # Import routers later
 from routes import router as api_router
 # Removed logging.config import
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response # Import Response
 
 # Import RichHandler for colored logging
 from rich.logging import RichHandler
+
+# --- Add slowapi imports ---
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware # Import the middleware
 
 # --- Unified Logging Configuration with Rich ---
 LOGGING_CONFIG = {
@@ -75,6 +83,8 @@ load_dotenv() # Simpler: load_dotenv searches current dir and parents
 
 MONGODB_URI = os.getenv("MONGODB_URI")
 DB_NAME = os.getenv("DB_NAME", "finance_db") # Default DB name if not set
+MAX_UPLOAD_SIZE = 1 * 1024 * 1024  # 1MB limit
+UPLOAD_ENDPOINT_PATH = "/api/upload" # Define the upload path constant
 
 if not MONGODB_URI:
     logger.error("MONGODB_URI environment variable not set! Database connection will fail.")
@@ -83,6 +93,34 @@ if not MONGODB_URI:
 
 # Application state to hold the database client and collection
 app_state = {}
+
+# --- Rate Limiter Setup ---
+# Removed storage_uri to default to in-memory storage
+limiter = Limiter(key_func=get_remote_address)
+DEFAULT_RATE_LIMIT = "15/minute" # Define the rate limit string
+
+# --- Middleware for Upload Size Limit ---
+class LimitUploadSizeMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Check if the request path matches the upload endpoint
+        if request.url.path == UPLOAD_ENDPOINT_PATH:
+            content_length_header = request.headers.get("content-length")
+            if content_length_header:
+                try:
+                    content_length = int(content_length_header)
+                    if content_length > MAX_UPLOAD_SIZE:
+                        logger.warning(f"Upload rejected: File size {content_length} exceeds limit {MAX_UPLOAD_SIZE}.")
+                        # Use Starlette Response for custom body
+                        return Response(f"Maximum file upload size limit ({MAX_UPLOAD_SIZE / (1024*1024):.1f} MB) exceeded.", status_code=413)
+                except ValueError:
+                    logger.warning("Upload rejected: Invalid Content-Length header.")
+                    return Response("Invalid Content-Length header.", status_code=400)
+            # Note: If Content-Length is missing (e.g., chunked encoding), FastAPI handles streaming,
+            # but this middleware won't catch the size limit upfront.
+            # More complex streaming checks could be added if needed.
+
+        response = await call_next(request)
+        return response
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -101,6 +139,11 @@ async def lifespan(app: FastAPI):
         app_state["db"] = None
         app_state["expenses_collection"] = None
     
+    # --- Moved Rate Limiter Setup outside lifespan ---
+    # app.state.limiter = limiter
+    # app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    # app.add_middleware(SlowAPIMiddleware)
+    
     yield # Application runs here
     
     # Shutdown: Close MongoDB connection
@@ -116,7 +159,14 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware (still useful if API is called from other origins)
+# --- Apply Rate Limiter State and Handler (Moved Here) ---
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# --- Add Middleware (Moved Here - Order Matters) ---
+# 1. Rate Limiter Middleware (TEMPORARILY DISABLED)
+# app.add_middleware(SlowAPIMiddleware)
+# 2. CORS Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], # Adjust in production
@@ -124,9 +174,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# 3. Upload Size Limit Middleware (Re-enabled)
+app.add_middleware(LimitUploadSizeMiddleware)
 
-# Include the API router
-app.include_router(api_router, prefix="/api")
+# --- API Routes (Apply rate limiting via dependency - TEMPORARILY DISABLED) ---
+app.include_router(
+    api_router, 
+    prefix="/api", 
+    tags=["api"],
+    # Apply the rate limiter as a dependency to all routes in this router
+    # dependencies=[Depends(limiter.limit(DEFAULT_RATE_LIMIT))]
+)
 
 # Mount static files directory (MUST be after API router)
 app.mount("/", StaticFiles(directory="public", html=True), name="static")

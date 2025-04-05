@@ -78,12 +78,15 @@ $(document).ready(function() {
             filteredData.forEach(expense => {
                 const rowClass = expense.value >= 0 ? 'expense-income' : '';
                 const value = typeof expense.value === 'number' ? expense.value : parseFloat(expense.value);
-                const row = `<tr class="${rowClass}">
-                                <td>${expense.date}</td>
-                                <td>${expense.description}</td>
-                                <td>${isNaN(value) ? 'N/A' : value.toFixed(2)}</td>
-                            </tr>`;
-                $expensesTableBody.append(row);
+                
+                // Create elements safely using jQuery and .text()
+                const $row = $('<tr>').addClass(rowClass);
+                const $dateCell = $('<td>').text(expense.date); // Use .text() for safety
+                const $descCell = $('<td>').text(expense.description); // Use .text() for safety
+                const $valueCell = $('<td>').text(isNaN(value) ? 'N/A' : value.toFixed(2)); // Use .text() for safety
+                
+                $row.append($dateCell, $descCell, $valueCell);
+                $expensesTableBody.append($row);
             });
         }
         const totalRows = expensesData.length;
@@ -273,8 +276,7 @@ $(document).ready(function() {
                 const message = `Database cleaned successfully. Deleted ${response.deleted_count || 0} items. Refreshing...`;
                 displayStatus($debugStatus, message, 'success');
                 fetchExpenses(); // Refresh the main expenses table
-                // Optionally hide menu after success
-                // setTimeout(() => $debugMenu.addClass('hidden'), 2000);
+                setTimeout(() => $debugMenu.addClass('hidden'), 2000);
             },
             error: function(jqXHR, textStatus, errorThrown) {
                 console.error("Error cleaning database:", textStatus, errorThrown, jqXHR.responseText);

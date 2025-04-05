@@ -11,3 +11,6 @@ openai-agents
 
 # For colored + timestamped application logging
 rich==13.7.1
+
+# Rate Limiting
+slowapi
