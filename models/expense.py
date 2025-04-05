@@ -7,13 +7,12 @@ class Expense(BaseModel):
     """
     Represents a single expense or income transaction.
     """
-    id: Optional[str] = None # MongoDB ID
-    date: date # Restored type
+    id: Optional[str] = None
+    date: date
     description: str
-    value: float # Restored type
-    in_out: Literal['in', 'out'] # Restored type
+    value: float
+    in_out: Literal['in', 'out']
 
     class Config:
-        populate_by_name = True # Allows using '_id' in Python and 'id' in MongoDB
-        from_attributes = True # Replaced orm_mode for Pydantic V2
-        # Removed json_schema_extra for simplification 
+        populate_by_name = True
+        from_attributes = True 

@@ -1,9 +1,9 @@
 """API Routes for expenses"""
 from fastapi import APIRouter, UploadFile, File, HTTPException, Body, Depends, Request, Query
 from typing import List, Annotated, Optional
-from services import expenses_service # Import the service module
-from models.expense import Expense # Import the Pydantic model
-from motor.motor_asyncio import AsyncIOMotorCollection # For type hinting
+from services import expenses_service
+from models.expense import Expense
+from motor.motor_asyncio import AsyncIOMotorCollection
 import logging
 
 # Pydantic model for text input
@@ -38,32 +38,15 @@ async def get_expenses(
     """
     Fetches all expenses, allowing sorting via query parameters.
     """
-    # --- TEMPORARY DIAGNOSTIC LOG --- 
-    # logger.info("--- Executing CORRECT get_expenses definition (no 'func' parameter) ---") 
-    # --- END TEMPORARY LOG ---
-    
-    # --- TEMPORARILY RETURN HARDCODED DATA (Removed) --- 
-    # logger.info("--- Returning HARDCODED test data --- ")
-    # return [
-    #     {"id": "test1", "date": "2024-01-01", "description": "Test Expense 1", "value": -10.50, "in_out": "out"},
-    #     {"id": "test2", "date": "2024-01-02", "description": "Test Income 2", "value": 100.00, "in_out": "in"}
-    # ]
-    # --- END TEMPORARY HARDCODED DATA --- 
-
-    # Original logic below (Restored):
     logger.info(f"GET /expenses endpoint called. Sorting by '{sort_by}' order '{sort_order}'")
     try:
-        # Validate sort_by if necessary (e.g., ensure it's a valid field)
-        # Basic validation example:
         allowed_sort_fields = ['date', 'description', 'value', 'in_out']
         if sort_by not in allowed_sort_fields:
             raise HTTPException(status_code=400, detail=f"Invalid sort_by field. Allowed fields: {', '.join(allowed_sort_fields)}")
             
-        # Validate sort_order
         if sort_order not in [1, -1]:
              raise HTTPException(status_code=400, detail="Invalid sort_order value. Use 1 for ascending or -1 for descending.")
 
-        # Pass validated parameters to the service layer
         expenses = await expenses_service.get_all_expenses_from_db(collection, sort_by=sort_by, sort_order=sort_order)
         return expenses
     except ConnectionError as ce:
@@ -80,44 +63,40 @@ async def upload_expense_file(request: Request, file: UploadFile = File(...)):
     Validates file, sends to service for processing and storage using the injected DB collection.
     """
     collection = get_expenses_collection(request)
-    save_at_front = request.state.save_at_front # Get flag from request state
-    logger.info(f"POST /upload-file endpoint called for file: {file.filename} - SaveAtFront: {save_at_front}") # Log the flag
+    save_at_front = request.state.save_at_front
+    logger.info(f"POST /upload-file endpoint called for file: {file.filename} - SaveAtFront: {save_at_front}")
     
-    # Basic content type check (more robust checks in service)
     if not file.content_type in ["text/csv", "text/plain"] and not file.filename.lower().endswith(('.csv', '.txt')):
         logger.warning(f"Invalid file type attempted upload: {file.filename} ({file.content_type})")
         raise HTTPException(status_code=400, detail=f"Invalid file type: {file.content_type}. Please upload CSV or TXT.")
     
     try:
-        # Call service layer for processing, passing the collection AND the flag
         result = await expenses_service.process_uploaded_file(collection, file, save_at_front=save_at_front)
         logger.info(f"File {file.filename} processed. Result: {result}")
 
         # Determine appropriate status code based on service result
-        status_code = 200 # Default success
+        status_code = 200
         if result["status"] == "error" or (result["status"] == "partial_success" and result["added_count"] == 0):
-            status_code = 400 # Bad request if processing failed or yielded no results due to errors
+            status_code = 400
         elif result["status"] == "partial_success":
-            status_code = 207 # Multi-Status if some errors occurred but some data was added
+            status_code = 207
 
-        # Use raise HTTPException for client errors (4xx) or just return for success (2xx)
         if status_code >= 400:
              raise HTTPException(status_code=status_code, detail=result)
         else:
-            # Optionally customize the response body for 200/207
              return result 
 
-    except ValueError as ve: # Catch specific errors like bad format, decoding issues
+    except ValueError as ve:
         logger.error(f"ValueError processing file {file.filename}: {ve}")
         raise HTTPException(status_code=400, detail=str(ve))
-    except ConnectionError as ce: # Catch DB or AI connection errors from service
+    except ConnectionError as ce:
         logger.error(f"ConnectionError processing file {file.filename}: {ce}")
         raise HTTPException(status_code=503, detail=str(ce))
     except Exception as e:
         logger.exception(f"Unexpected error processing file {file.filename}: {e}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred processing file {file.filename}.")
     finally:
-        await file.close() # Ensure file is closed
+        await file.close()
 
 @router.post("/process-text", summary="Process Expense Text", description="Processes raw text input containing expense data using AI and stores it.")
 async def process_expense_text(request: Request, text_input: Annotated[TextInput, Body(...)]):
@@ -126,14 +105,13 @@ async def process_expense_text(request: Request, text_input: Annotated[TextInput
     Sends text to service layer for AI processing and storage.
     """
     collection = get_expenses_collection(request)
-    save_at_front = request.state.save_at_front # Get flag from request state
-    logger.info(f"POST /process-text endpoint called with text: {text_input.text_input[:50]}... - SaveAtFront: {save_at_front}") # Log the flag
+    save_at_front = request.state.save_at_front
+    logger.info(f"POST /process-text endpoint called with text: {text_input.text_input[:50]}... - SaveAtFront: {save_at_front}")
     
     if not text_input.text_input or not text_input.text_input.strip():
         raise HTTPException(status_code=400, detail="Text input cannot be empty.")
 
     try:
-        # Call service layer for processing, passing the collection AND the flag
         result = await expenses_service.process_text_input(collection, text_input.text_input, save_at_front=save_at_front)
         logger.info(f"Text input processed. Result: {result}")
 
@@ -149,10 +127,10 @@ async def process_expense_text(request: Request, text_input: Annotated[TextInput
         else:
              return result
 
-    except ValueError as ve: # Catch validation errors (e.g., empty input handled above, but service might add more)
+    except ValueError as ve:
         logger.error(f"ValueError processing text input: {ve}")
         raise HTTPException(status_code=400, detail=str(ve))
-    except ConnectionError as ce: # Catch AI or DB connection errors
+    except ConnectionError as ce:
         logger.error(f"ConnectionError processing text input: {ce}")
         raise HTTPException(status_code=503, detail=str(ce))
     except Exception as e:
@@ -182,7 +160,6 @@ async def delete_all_expenses_route(collection: ExpensesCollectionDep):
 async def clear_database(request: Request):
     """API endpoint to clear all expenses from the database."""
     collection = get_expenses_collection(request)
-    # No need to pass save_at_front for clearing
     logger.warning("POST /expenses/clear endpoint called. This will clear the database.")
     try:
         result = await expenses_service.delete_all_expenses(collection)

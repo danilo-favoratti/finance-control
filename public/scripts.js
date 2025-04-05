@@ -1,15 +1,10 @@
-// Frontend JavaScript for Finance Manager
-
 $(document).ready(function() {
-    console.log("Document ready. Initializing...");
-
-    // --- Configuration --- 
     // Set this to true to enable saving/loading from local storage instead of the backend DB
-    const SAVE_AT_FRONT_ENABLED = true; 
+    const SAVE_AT_FRONT_ENABLED = true;
     const LOCAL_STORAGE_KEY = 'expenses';
 
-    const API_BASE_URL = "/api"; // Assuming backend is served relative to frontend
-    let expensesData = []; // To store fetched/loaded expenses
+    const API_BASE_URL = "/api";
+    let expensesData = [];
     let sortColumn = 'date';
     let sortDirection = 'desc';
 
@@ -161,10 +156,8 @@ $(document).ready(function() {
                     expensesData = [];
                     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(expensesData));
                 }
-                console.log(`Loaded ${expensesData.length} expenses from local storage.`);
             } else {
                 expensesData = [];
-                console.log("No expenses found in local storage.");
             }
         } catch (error) {
             console.error("Error loading or parsing expenses from local storage:", error);
@@ -181,47 +174,38 @@ $(document).ready(function() {
             return false;
         }
         try {
-            // Always store the complete, updated list
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newExpenses));
-            console.log(`Saved ${newExpenses.length} total expenses to local storage.`);
             return true;
         } catch (error) {
             console.error("Error saving expenses to local storage:", error);
-            // Optionally display an error to the user
             return false;
         }
     }
 
     // Function to add new processed expenses to local storage data
     function addProcessedExpensesToLocal(processedExpenses) {
-        console.log("[addProcessedExpensesToLocal] Called with:", processedExpenses);
         if (!processedExpenses || processedExpenses.length === 0) {
-            console.log("[addProcessedExpensesToLocal] No processed expenses to add.");
-            return; // Nothing to add
+            return;
         }
         
         // Load current local data
         let currentLocalExpenses = [];
         try {
             const storedData = localStorage.getItem(LOCAL_STORAGE_KEY);
-            console.log("[addProcessedExpensesToLocal] Current raw data from local storage:", storedData);
             if (storedData) {
                 const parsedData = JSON.parse(storedData);
                 if(Array.isArray(parsedData)) {
                     currentLocalExpenses = parsedData;
-                    console.log("[addProcessedExpensesToLocal] Parsed current local expenses:", currentLocalExpenses);
                 }
             }
         } catch (error) {
             console.error("[addProcessedExpensesToLocal] Error reading local storage before adding:", error);
         }
 
-        // Combine and save (simple append for now, could add duplicate checks here too if needed)
+        // Combine and save
         const updatedExpenses = [...currentLocalExpenses, ...processedExpenses];
-        console.log("[addProcessedExpensesToLocal] Combined expenses for saving:", updatedExpenses);
         if (saveExpensesToLocalStorage(updatedExpenses)) {
             expensesData = updatedExpenses; // Update the in-memory store
-            console.log("[addProcessedExpensesToLocal] Successfully saved. Rendering table.");
             renderTable(expensesData); // Re-render the table with combined data
         } else {
             console.error("[addProcessedExpensesToLocal] Failed to save updated expenses to local storage.");
@@ -251,10 +235,8 @@ $(document).ready(function() {
     // Unified fetch/load function
     function loadInitialExpenses() {
         if (SAVE_AT_FRONT_ENABLED) {
-            console.log("Loading expenses from Local Storage...");
             loadExpensesFromLocalStorage();
         } else {
-            console.log("Fetching expenses from API...");
             fetchExpensesFromAPI();
         }
     }
@@ -274,12 +256,11 @@ $(document).ready(function() {
                 let message = `File ${file.name} processed.`;
                 let statusType = 'success';
 
-                // Response structure from backend is now consistent
                 const addedToDbCount = response.added_count || 0;
                 const processedCount = response.processed_count || 0;
                 const skippedCount = response.skipped_count || 0;
                 const errorsCount = response.errors?.length || 0;
-                const processedExpenses = response.processed_expenses || []; // IMPORTANT: Define processedExpenses here too!
+                const processedExpenses = response.processed_expenses || [];
 
                 if (response.status === 'success') {
                     if (SAVE_AT_FRONT_ENABLED) {
@@ -314,15 +295,12 @@ $(document).ready(function() {
                 displayStatus($fileStatus, message, statusType);
 
                 // Refresh logic
-                console.log(`[uploadFile Success] SAVE_AT_FRONT_ENABLED: ${SAVE_AT_FRONT_ENABLED}, Status: ${statusType}, Processed Count: ${processedExpenses.length}`);
                 if (SAVE_AT_FRONT_ENABLED) {
                     if (statusType !== 'error' && processedExpenses.length > 0) {
                         addProcessedExpensesToLocal(processedExpenses); // Add new items to local storage and re-render
                     } else if (statusType === 'error') {
                          // Do nothing on error, table already shows old data
-                        console.log("[uploadFile Success] Skipping local storage update due to error status.");
                     } else {
-                        console.log("[uploadFile Success] No new processed expenses or non-error status. Re-rendering table with existing data.");
                         renderTable(expensesData); // Re-render even if no new data processed (e.g., only duplicates)
                     }
                 } else {
@@ -367,14 +345,13 @@ $(document).ready(function() {
             success: function(response, textStatus, jqXHR) {
                 let message = "Text processed.";
                 let statusType = 'success';
-                let processedExpenses = []; // Define EARLY
+                let processedExpenses = [];
 
-                // Extract details from response
                 const addedToDbCount = response.added_count || 0;
                 const processedCount = response.processed_count || 0;
                 const skippedCount = response.skipped_count || 0;
                 const errorsCount = response.errors?.length || 0;
-                processedExpenses = response.processed_expenses || []; // Assign HERE
+                processedExpenses = response.processed_expenses || [];
 
                 // Determine message based on status and save mode
                 if (response.status === 'success') {
@@ -408,15 +385,12 @@ $(document).ready(function() {
                 }
                 
                 // Refresh logic
-                console.log(`[processText Success] SAVE_AT_FRONT_ENABLED: ${SAVE_AT_FRONT_ENABLED}, Status: ${statusType}, Processed Count: ${processedExpenses.length}`);
                 if (SAVE_AT_FRONT_ENABLED) {
                     if (statusType !== 'error' && processedExpenses.length > 0) {
                         addProcessedExpensesToLocal(processedExpenses); // Add new items to local storage and re-render
                     } else if (statusType === 'error') {
                          // Do nothing on error, table already shows old data
-                        console.log("[processText Success] Skipping local storage update due to error status.");
                     } else {
-                        console.log("[processText Success] No new processed expenses or non-error status. Re-rendering table with existing data.");
                         renderTable(expensesData); // Re-render even if no new data processed
                     }
                 } else {
@@ -453,7 +427,6 @@ $(document).ready(function() {
                 expensesData = []; // Clear in-memory array
                 renderTable(expensesData); // Update the table
                 displayStatus($debugStatus, 'Local storage cleared successfully!', 'success');
-                console.log("Local storage cleared.");
                 alert('Local storage cleared successfully!'); // User feedback
             } catch (error) {
                 console.error("Error clearing local storage:", error);
@@ -508,7 +481,6 @@ $(document).ready(function() {
     $dropZone.on('drop', function(e) {
         const files = e.originalEvent.dataTransfer.files;
         if (files.length > 0) {
-            // Basic validation (could add more checks for type/size)
             uploadFile(files[0]);
         }
     });
@@ -524,7 +496,7 @@ $(document).ready(function() {
     $fileInput.on('change', function() {
         if (this.files.length > 0) {
             uploadFile(this.files[0]);
-            $(this).val(''); // Reset file input
+            $(this).val('');
         }
     });
 
@@ -544,19 +516,18 @@ $(document).ready(function() {
             sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
         } else {
             sortColumn = newSortColumn;
-            sortDirection = 'asc'; // Default to ascending on new column
+            sortDirection = 'asc';
         }
         
         // Add new sort indicator
         $(this).addClass(sortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
         
-        // TODO: Add visual indicators for sort column/direction - Now handled by adding classes
         renderTable(expensesData);
     });
 
     // Search Input
     $searchInput.on('keyup', function() {
-        renderTable(expensesData); // Re-render table with current search term
+        renderTable(expensesData);
     });
 
     // Debug Menu Handlers
@@ -566,11 +537,10 @@ $(document).ready(function() {
 
     $closeDebugBtn.on('click', function() {
         $debugMenu.addClass('hidden');
-        $debugStatus.text('').removeClass('status-success status-error status-loading'); // Clear status on close
+        $debugStatus.text('').removeClass('status-success status-error status-loading');
     });
 
     $cleanDbBtn.on('click', function() {
-        // Use the updated function name
         clearDatabaseOrLocalStorage();
     });
 
@@ -645,6 +615,5 @@ $(document).ready(function() {
     });
 
     // --- Initial Load ---
-    console.log(`Initializing with SAVE_AT_FRONT_ENABLED = ${SAVE_AT_FRONT_ENABLED}`);
-    loadInitialExpenses(); // Use the unified load function
+    loadInitialExpenses();
 }); 

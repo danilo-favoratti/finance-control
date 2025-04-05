@@ -9,6 +9,8 @@ A modern web application for managing personal finances, with features for track
 - 💬 Process text descriptions into structured data
 - 🔍 Search and filter transactions
 - 📈 Real-time statistics (Expenses, Income, Net Total)
+- 💾 **Local Storage Mode:** Option to run entirely client-side, saving data in the browser.
+- 📤 **Export Data:** Export current expenses to CSV or XLS format.
 - 🌓 Dark theme interface
 - 🔄 Sort by date, description, or value
 
@@ -44,9 +46,10 @@ A modern web application for managing personal finances, with features for track
    cp .env.example .env
    ```
    Edit `.env` and update the following variables:
-   - `MONGODB_URI`: Your MongoDB connection string
-   - `OPENAI_API_KEY`: Your OpenAI API key (if using text processing)
-   - `LOG_LEVEL`: Optional logging level
+   - `MONGODB_URI`: Your MongoDB connection string (required unless `SAVE_AT_FRONT` is true)
+   - `OPENAI_API_KEY`: Your OpenAI API key (required for text processing)
+   - `SAVE_AT_FRONT`: Set to `true` to enable local storage mode (saves data in the browser instead of MongoDB). Defaults to `false`.
+   - `LOG_LEVEL`: Optional logging level (e.g., `INFO`, `DEBUG`)
 
 ### Running the Application
 
@@ -70,6 +73,10 @@ A modern web application for managing personal finances, with features for track
 - Enter or paste text descriptions of expenses/income
 - The system will automatically extract and structure the data
 
+### Data Export
+- Click the "Export" button in the expenses header.
+- Select CSV or XLS format from the modal to download the currently displayed expenses.
+
 ### Data Management
 - View all transactions in the table
 - Search using the search bar
@@ -84,12 +91,16 @@ finance-manager/
 ├── main.py           # FastAPI application
 ├── routes.py         # API endpoints
 ├── services/         # Business logic
-├── models/          # Data models
-├── public/          # Frontend assets
+├── models/           # Data models
+├── utils/            # Utility functions (e.g., OpenAI agent)
+├── public/           # Frontend assets
 │   ├── index.html
 │   ├── styles.css
 │   └── scripts.js
-└── requirements.txt  # Python dependencies
+├── test-data/        # Sample files for testing
+├── .env.example      # Environment variable template
+├── requirements.txt  # Python dependencies
+└── README.md
 ```
 
 ## 📝 License

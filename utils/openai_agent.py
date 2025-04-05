@@ -147,23 +147,4 @@ async def process_text_with_agent(text_content: str) -> List[Dict[str, Any]]:
         # Re-raise as ConnectionError or a more specific custom error
         raise ConnectionError(f"Agent SDK processing failed: {e}")
 
-# Keep this async, even if Runner.run is used, for consistency with FastAPI/service layer
-async def main_test():
-    # Example usage for testing
-    test_text = """
-    Saw Avengers movie on Jan 5th 2024, cost $25.50
-    Got paid salary $3500 on 10/01/2024
-    Grocery shopping at Tesco - £45.30 - 11th Jan
-    Dinner with friends, my share was 30 dollars, Jan 12th 2024
-    Refund from Amazon $15.99 received 13 Jan 2024
-    """
-    extracted = await process_text_with_agent(test_text)
-    print("Extracted Data:")
-    import json
-    print(json.dumps(extracted, indent=2, default=str)) # Use default=str for date objects
-
-if __name__ == "__main__":
-    import asyncio
-    # Setup logger to show info for testing
-    logging.basicConfig(level=logging.INFO) 
-    asyncio.run(main_test()) 
+# Keep this async, even if Runner.run is used, for consistency with FastAPI/service layer 
