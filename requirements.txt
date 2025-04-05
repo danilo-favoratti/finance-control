@@ -6,5 +6,8 @@ openai==1.70.0
 python-dotenv==1.1.0
 python-multipart==0.0.20
 aiofiles==24.1.0
-requests==2.32.3
+requests>=2.20.0
 openai-agents
+
+# For colored + timestamped application logging
+rich==13.7.1

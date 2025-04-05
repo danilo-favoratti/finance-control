@@ -2,6 +2,7 @@
 import logging
 import csv
 import io
+import json # Import json for pretty printing
 from fastapi import UploadFile
 from typing import List, Dict, Any
 from models.expense import Expense
@@ -50,6 +51,8 @@ async def add_multiple_expenses_to_db(collection: AsyncIOMotorCollection, expens
     valid_expenses_for_db = []
 
     for item_index, expense_data in enumerate(expenses_data):
+        # Pretty print the dictionary using json.dumps for readability
+        logger.debug(f"Processing item #{item_index}:\n{json.dumps(expense_data, indent=2, default=str)}") 
         try:
             # Data Cleaning/Preparation
             if 'id' in expense_data: del expense_data['id'] # Remove any incoming ID
@@ -108,6 +111,7 @@ async def add_multiple_expenses_to_db(collection: AsyncIOMotorCollection, expens
             # Convert date to datetime for MongoDB
             expense_dict['date'] = datetime.combine(expense_model.date, datetime.min.time())
             valid_expenses_for_db.append(expense_dict)
+            logger.debug(f"Item #{item_index} validated successfully.") # Log successful validation
 
         except ValidationError as e:
             logger.warning(f"Skipping item #{item_index} due to validation error: {e}")
@@ -197,6 +201,7 @@ async def process_uploaded_file(collection: AsyncIOMotorCollection, file: Upload
     extracted_data = []
     try:
         content = await file.read()
+        logger.info(f"Read {len(content)} bytes from {file.filename}.") # Log bytes read
         if not content:
              logger.warning(f"Uploaded file {file.filename} is empty.")
              return {"status": "error", "message": "File is empty.", "added_count": 0, "errors": ["File is empty."]}
@@ -208,8 +213,10 @@ async def process_uploaded_file(collection: AsyncIOMotorCollection, file: Upload
             logger.info("TXT file detected. Decoding and sending to AI agent...")
             try:
                 text_content = content.decode('utf-8')
+                logger.info(f"Decoded TXT content (first 100 chars): {text_content[:100]}...") # Log decoded text start
                 # Call the actual OpenAI processing function (renamed for clarity)
                 extracted_data = await process_text_with_agent(text_content) 
+                logger.info(f"AI agent returned {len(extracted_data)} items from TXT file.") # Log items returned by AI
             except UnicodeDecodeError:
                  logger.error(f"Could not decode TXT file {file.filename}. Ensure UTF-8 encoding.")
                  raise ValueError("Could not read TXT file. Ensure UTF-8 encoding.")
@@ -251,7 +258,9 @@ async def process_text_input(collection: AsyncIOMotorCollection, text_data: str)
 
     try:
         # Call the actual OpenAI processing function
+        logger.info(f"Sending text to AI agent (first 100 chars): {text_data[:100]}...") # Log text sent to AI
         extracted_data = await process_text_with_agent(text_data)
+        logger.info(f"AI agent returned {len(extracted_data)} items from text input.") # Log items returned by AI
         
         if not extracted_data:
             logger.info("AI agent returned no data from text input. Nothing to add to DB.")

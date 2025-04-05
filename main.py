@@ -9,14 +9,69 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 # Import routers later
 from routes import router as api_router
+# Removed logging.config import
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Import RichHandler for colored logging
+from rich.logging import RichHandler
+
+# --- Unified Logging Configuration with Rich ---
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "default": {
+            # RichHandler will handle timestamp and color, format is less critical here
+            # but we can define basic structure if needed by other handlers potentially.
+            "format": "%(name)s - %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S", # RichHandler uses its own time format by default
+        },
+    },
+    "handlers": {
+        "default": {
+            "class": "rich.logging.RichHandler",
+            "formatter": "default",
+            "level": "DEBUG",
+            "rich_tracebacks": True,
+            "show_time": True,
+            "show_path": False,
+            "log_time_format": "%Y-%m-%d %H:%M:%S",
+            "markup": True
+        },
+    },
+    "loggers": {
+        "uvicorn": {
+             "handlers": ["default"],
+             "level": "INFO",
+             "propagate": False,
+        },
+        "uvicorn.error": {
+            "handlers": ["default"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "uvicorn.access": {
+            "handlers": ["default"],
+            "level": "INFO", 
+            "propagate": False,
+        },
+        "": { # Root logger for our application
+            "handlers": ["default"],
+            "level": "INFO", # Set desired level for app logs (INFO or DEBUG)
+            "propagate": False,
+        },
+    },
+}
+
+# Apply logging configuration directly
+logging.config.dictConfig(LOGGING_CONFIG)
+
+# Get application logger instance (will use the config above)
 logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file in the backend directory
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
-load_dotenv(dotenv_path=dotenv_path)
+# Ensure this path is correct if main.py is at the root
+# dotenv_path = os.path.join(os.path.dirname(__file__), '.env') 
+load_dotenv() # Simpler: load_dotenv searches current dir and parents
 
 MONGODB_URI = os.getenv("MONGODB_URI")
 DB_NAME = os.getenv("DB_NAME", "finance_db") # Default DB name if not set
@@ -95,4 +150,11 @@ async def add_db_to_request(request, call_next):
 if __name__ == "__main__":
     import uvicorn
     # Now run from the root directory
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True) 
+    # Uvicorn will use its default logging for its own messages (with colors)
+    # Our application logs will use the RichHandler configured above
+    uvicorn.run(
+        "main:app", 
+        host="0.0.0.0", 
+        port=8000, 
+        reload=True
+    ) 
